@@ -1,7 +1,4 @@
-import sys
-
-from patron_arby.patron_arby import fib
+from patron_arby.exchange.listener import BinanceDataListener
 
 if __name__ == "__main__":
-    n = int(sys.argv[1])
-    print(fib(n))
+    BinanceDataListener().run()

@@ -1,7 +1,17 @@
 # patron-arby
+Intra-exchange triangular arbitrage.
+
+(Sacred project name is "Petronius Arbiter")
 
 ## Setup
 ```sh
+# Install pipx if pipenv and cookiecutter are not installed
+python3 -m pip install pipx
+python3 -m pipx ensurepath
+
+# Install pipenv using pipx
+pipx install pipenv
+
 # Install dependencies
 pipenv install --dev
 

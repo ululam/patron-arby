@@ -1,0 +1,13 @@
+# serverless.yml
+plugins:
+  - serverless-python-requirements
+service: patron-arby
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    invalidateCaches: true
+provider:
+  name: aws
+  stage: staging
+  profile: goodit
+  runtime: python3.7
