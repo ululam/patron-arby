@@ -1,15 +1,14 @@
 import json
 import logging
 import math
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
-from binance.client import Client
 from unicorn_binance_websocket_api.unicorn_binance_websocket_api_manager import (
     BinanceWebSocketApiManager,
 )
 
 from patron_arby.arbitrage.market_data import MarketData
-from patron_arby.config.staging import BINANCE_API_KEY, BINANCE_API_SECRET
+from patron_arby.settings import BINANCE_API_KEY, BINANCE_API_SECRET
 
 log = logging.getLogger(__name__)
 
@@ -37,15 +36,10 @@ class BinanceDataListener:
             exchange="binance.com"
         )
 
-        # self.ws_manager.create_stream(
-        #     ['!miniTicker', '!ticker', '!bookTicker'],
-        #     ["arr"],  # Means "single stream for all"
-        #     api_key=binance_api_key,
-        #     api_secret=binance_api_secret
-        # )
+        coins, markets = self._get_all_coins_and_markets(binance_api_key, binance_api_secret)
+        log.info(f"Totally markets: {len(markets)}")
 
-        markets = self._get_all_markets(binance_api_key, binance_api_secret)
-        print(f"Totally markets: {len(markets)}")
+        self.market_data.set_coins_and_markets(coins, markets)
 
         self._create_streams(markets)
 
@@ -62,13 +56,12 @@ class BinanceDataListener:
 
             self.market_data.put(ticker_event)
 
-    def _get_all_markets(self, binance_api_key: str, binance_api_secret: str) -> List[str]:
-        binance_rest_client = Client(binance_api_key, binance_api_secret)
-        markets = []
-        data = binance_rest_client.get_all_tickers()
-        for item in data:
-            markets.append(item['symbol'])
-        return markets[:100]
+    def _get_all_coins_and_markets(self, binance_api_key: str, binance_api_secret: str) -> Tuple[List[str], List[str]]:
+        # binance_rest_client = Client(binance_api_key, binance_api_secret)
+        # coins = [item['coin'] for item in binance_rest_client.get_all_coins_info()]
+        # markets = [item['symbol'] for item in binance_rest_client.get_all_tickers()]
+        # return coins, markets
+        return ["BTC", "USDT", "ETH"], ["BTCUSDT", "ETHBTC", "ETHUSDT"]
 
     def _create_streams(self, markets: List):
         divisor = math.ceil(len(markets) / self.ws_manager.get_limit_of_subscriptions_per_stream())

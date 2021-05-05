@@ -1,0 +1,64 @@
+from unittest import TestCase
+
+from patron_arby.arbitrage.arby import Arby
+
+
+class TestArby(TestCase):
+    def test__get_coin_price_in_another_coin_forward(self):
+        # 1. Arrange
+        bidask = {
+            "Market": "BTCUSDT",
+            "BestBid": 55100,
+            "BestBidQuantity": 1.22,
+            "BestAsk": 55200,
+            "BestAskQuantity": 2.01
+        }
+
+        # 2. Act
+        price, quantity = Arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
+        print(f"I can buy {quantity} BTC for USDT at the price {price}")
+        print(f"This is equivalent to BUY {bidask.get('BestAskQuantity')} BTC at the price {bidask.get('BestAsk')} "
+              f"for 1 BTC")
+
+        # 3. Assert
+        self.assertEqual(55200, price)
+        self.assertEqual(2.01, quantity)
+
+    def test__get_coin_price_in_another_coin_reverse(self):
+        # 1. Arrange
+        bidask = {
+            "Market": "BTCUSDT",
+            "BestBid": 55100,
+            "BestBidQuantity": 1.22,
+            "BestAsk": 55200,
+            "BestAskQuantity": 2.01
+        }
+
+        # 2. Act
+        price, quantity = Arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        print(f"I can buy {quantity} USDT for BTC at the price {price}")
+        print(f"This is equivalent to SELL {bidask.get('BestBidQuantity')} BTC at the price {bidask.get('BestBid')} "
+              f"for 1 BTC")
+        # 3. Assert
+        self.assertEqual(1 / 55100, price)
+        self.assertEqual(55100 * 1.22, quantity)
+
+    def test__cyclic_buy_sell_same_market_decrease_amount(self):
+        # 1. Arrange
+        bidask = {
+            "Market": "BTCUSDT",
+            "BestBid": 55100,
+            "BestBidQuantity": 1.22,
+            "BestAsk": 55200,
+            "BestAskQuantity": 2.01
+        }
+
+        btc_amount = 1
+
+        # 2. Act
+        price_btc, quantity_btc = Arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
+        price_usdt, quantity_usdt = Arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+
+        # 3. Assert
+        btc_amount_after_buy_sell = (btc_amount / price_usdt) / price_btc
+        self.assertLess(btc_amount_after_buy_sell, btc_amount)

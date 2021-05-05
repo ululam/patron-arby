@@ -1,0 +1,2 @@
+class FinUtils:
+    pass

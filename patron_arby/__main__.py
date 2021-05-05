@@ -1,4 +1,5 @@
 import threading
+import time
 
 import dash
 import dash_table
@@ -48,14 +49,25 @@ def get_market_data():
     return res
 
 
+def run_arbitrage():
+    while True:
+        petronius_arbiter.find()
+        time.sleep(3)
+
+
+market_data = MarketData()
+petronius_arbiter = Arby(market_data)
+bl = BinanceDataListener(market_data)
+
 if __name__ == "__main__":
-    market_data = MarketData()
-    bl = BinanceDataListener(market_data)
-    petronius_arbiter = Arby(market_data)
-    threading.Thread(target=bl.run).start()
+    listener_thread = threading.Thread(target=bl.run)
+    arby_thread = threading.Thread(target=run_arbitrage)
+
+    listener_thread.start()
+    arby_thread.start()
 
     # _run_web()
     server.run(debug=True)
 
-    # arby_thread = threading.Thread(target=lambda: every(500, do_it))
-    # arby_thread.start()
+    listener_thread.join()
+    arby_thread.join()

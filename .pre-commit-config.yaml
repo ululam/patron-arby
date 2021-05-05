@@ -30,7 +30,7 @@ repos:
     name: pytest
     stages: [commit]
     language: system
-    entry: pipenv run pytest
+    entry: pipenv run pytest patron_arby
     types: [python]
     pass_filenames: false
 
