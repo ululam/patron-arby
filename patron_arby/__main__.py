@@ -52,8 +52,19 @@ def get_market_data():
 
 def run_arbitrage():
     while True:
-        time.sleep(5)
-        petronius_arbiter.find()
+        time.sleep(1)
+        result = petronius_arbiter.find()
+        if len(result) == 0:
+            continue
+        result.sort(key=lambda val: -float(val.get("roi")))
+        positive_result = [r for r in result if float(r.get("roi")) > 0]
+        if len(positive_result) == 0:
+            print(f"PETRONIUS ARBITER found no profit. Best ROI is {result[0]}")
+            continue
+        print("$$$$$$$$ PETRONIUS ARBITER")
+        for pr in positive_result:
+            print(pr)
+        print("$$$$$$$$")
 
 
 binance_api = BinanceApi()

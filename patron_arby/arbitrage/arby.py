@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.decorators import log_execution_time
+from patron_arby.common.util import current_time_ms
 
 log = logging.getLogger(__name__)
 
@@ -18,14 +19,13 @@ class PetroniusArbiter:
         self.default_order_fee_factor = default_order_fee_factor
 
     @log_execution_time
-    def find(self, order_fee_factor: float = None) -> List[Dict]:
+    def find(self) -> List[Dict]:
         """
         Finds arbitrage paths
-        :param order_fee_factor: Order placement factor (percent * 0.01)
         :return: List of triangle paths with ROI, profit, and available volume
         """
-        log.info(" =========== Starting find cycle")
-        order_fee_factor = order_fee_factor if order_fee_factor else self.default_order_fee_factor
+        log.debug(" =========== Starting find cycle")
+        start_time = current_time_ms()
         price_volume_data = self.market_data.get()
         if len(price_volume_data) == 0:
             log.warning("No data present yet, skipping finding arbitrage")
@@ -73,11 +73,12 @@ class PetroniusArbiter:
                         "profit": profit
                     })
 
-                    log.debug(f">>> We can run through {max_coin_a_volume_available} {coin_a}s with {roi} ROI, "
+                    if log.isEnabledFor(logging.FINE):
+                        log.fine(f">>> We can run through {max_coin_a_volume_available} {coin_a}s with {roi} ROI, "
                               f"resulting in {profit} {coin_a}s profit")
-                    log.debug(f"{self._path(coin_a, coin_b, coin_c, coin_a)}: = {profit}\n")
+                        log.fine(f"{self._path(coin_a, coin_b, coin_c, coin_a)}: = {profit}\n")
 
-        log.info(" =========== End find cycle")
+        log.debug(f" =========== End find cycle ({current_time_ms() - start_time} ms)")
         return result
 
     def _calc_move_to_coin_b(self, coin_a: str, coin_ba_market: str, price_volume_data: Dict) \
@@ -160,12 +161,11 @@ class PetroniusArbiter:
         coin_ba_in_a_volume = coin_ba_price_volume[0] * coin_ba_price_volume[1]
         coin_cb_in_a_volume = coin_cb_price_volume[0] * coin_cb_price_volume[1] * coin_ba_price_volume[0]
         coin_ac_in_a_volume = coin_ac_price_volume[1]
-        log.debug(f"Volumes available in coin_a units: {coin_ba_in_a_volume}, {coin_cb_in_a_volume},"
-                  f" {coin_ac_in_a_volume}")
         return min(coin_ba_in_a_volume, coin_cb_in_a_volume, coin_ac_in_a_volume)
 
     @staticmethod
     def _calculate_triangle_roi(*prices):
+        # todo Can I do it here, simply?
         factor = 1
         for p in prices:
             factor = factor * p
@@ -185,13 +185,8 @@ class PetroniusArbiter:
     def _path(*coins):
         return " -> ".join(coins)
 
-    @staticmethod
-    def _get_coin_price_and_quantity_in_another_coin(bidask_dict: Dict, coin: str) -> Tuple[float, float]:
-        try:
-            market = bidask_dict.get("Market")
-        except Exception as e:
-            log.debug(f"For coin {coin}")
-            raise e
+    def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) -> Tuple[float, float]:
+        market = bidask_dict.get("Market")
 
         base_quote = market.split("/")
         if coin == base_quote[0]:
@@ -207,15 +202,16 @@ class PetroniusArbiter:
         bid_quantity = float(bidask_dict.get("BestBidQuantity"))
         ask_quantity = float(bidask_dict.get("BestAskQuantity"))
 
-        price = ask if forward_buy else 1 / bid
+        price = ask * (1 + self.default_order_fee_factor) if forward_buy \
+            else 1 / (bid * (1 - self.default_order_fee_factor))
         quantity = ask_quantity if forward_buy else bid_quantity / price
 
         return price, quantity
 
     def _print_buy_info(self, coin_1: str, coin_2: str, coin_21_price: float, coin_21_quantity: float):
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug(f"We can buy {coin_21_quantity} {coin_2}s for {coin_1} at the price {coin_21_price}")
-            log.debug(f"  That means, we are spending {coin_21_quantity*coin_21_price} {coin_1} for {coin_21_quantity}"
+        if log.isEnabledFor(logging.FINE):
+            log.fine(f"We can buy {coin_21_quantity} {coin_2}s for {coin_1} at the price {coin_21_price}")
+            log.fine(f"  That means, we are spending {coin_21_quantity*coin_21_price} {coin_1} for {coin_21_quantity}"
                   f" {coin_2}s")
 
     def _out_path(self, out_dict: Dict):

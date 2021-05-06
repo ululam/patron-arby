@@ -19,9 +19,9 @@ class TestArby(TestCase):
             "BestAsk": 55200,
             "BestAskQuantity": 2.01
         }
-
+        arby = PetroniusArbiter(MarketData(dict()), 0)
         # 2. Act
-        price, quantity = PetroniusArbiter._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
+        price, quantity = arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
         log.debug(f"I can buy {quantity} BTC for USDT at the price {price}")
         log.debug(f"This is equivalent to BUY {bidask.get('BestAskQuantity')} BTC at the price {bidask.get('BestAsk')} "
               f"for 1 BTC")
@@ -39,9 +39,9 @@ class TestArby(TestCase):
             "BestAsk": 55200,
             "BestAskQuantity": 2.01
         }
-
+        arby = PetroniusArbiter(MarketData(dict()), 0)
         # 2. Act
-        price, quantity = PetroniusArbiter._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        price, quantity = arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
         log.debug(f"I can buy {quantity} USDT for BTC at the price {price}")
         log.debug(f"This is equivalent to SELL {bidask.get('BestBidQuantity')} BTC at the price {bidask.get('BestBid')} "
               f"for 1 BTC")
@@ -58,12 +58,12 @@ class TestArby(TestCase):
             "BestAsk": 55200,
             "BestAskQuantity": 2.01
         }
-
         btc_amount = 1
+        arby = PetroniusArbiter(MarketData(dict()), 0)
 
         # 2. Act
-        price_btc, quantity_btc = PetroniusArbiter._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
-        price_usdt, quantity_usdt = PetroniusArbiter._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        price_btc, quantity_btc = arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
+        price_usdt, quantity_usdt = arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
 
         # 3. Assert
         btc_amount_after_buy_sell = (btc_amount / price_usdt) / price_btc
@@ -71,7 +71,7 @@ class TestArby(TestCase):
 
     def test__find_using_real_market_snapshot(self):
         # 1. Arrange
-        arby = PetroniusArbiter(self._load_market_data())
+        arby = PetroniusArbiter(self._load_market_data(), 0.01)
 
         # 2. Act
         result = arby.find()
@@ -81,6 +81,10 @@ class TestArby(TestCase):
 
         # 3. Assert
         # no exceptions
+
+    def test__commissions(self):
+        # todo Implement commisions tests
+        pass
 
     def _load_market_data(self):
         path_to_current_dir = os.path.dirname(os.path.realpath(__file__))
