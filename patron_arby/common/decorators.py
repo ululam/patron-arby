@@ -36,7 +36,7 @@ def log_execution_time(func: callable):
     def wrapper(*args, **kwargs):
         start = current_time_ms()
         result = func(*args, **kwargs)
-        log.info("Executed %s::%s() in %d ms", _obj_name(func), func.__name__, (current_time_ms() - start))
+        print(f"Executed {_obj_name(func)}::{func.__name__}() in {(current_time_ms() - start)} ms")
         return result
 
     return wrapper

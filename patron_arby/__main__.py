@@ -6,9 +6,10 @@ import dash_table
 import flask
 from flask import Flask
 
-from patron_arby.arbitrage.arby import Arby
+from patron_arby.arbitrage.arby import PetroniusArbiter
 from patron_arby.arbitrage.market_data import MarketData
-from patron_arby.exchange.listener import BinanceDataListener
+from patron_arby.exchange.binance.api import BinanceApi
+from patron_arby.exchange.binance.listener import BinanceDataListener
 
 server = Flask(__name__)
 
@@ -51,12 +52,12 @@ def get_market_data():
 
 def run_arbitrage():
     while True:
+        time.sleep(5)
         petronius_arbiter.find()
-        time.sleep(3)
 
 
-market_data = MarketData()
-petronius_arbiter = Arby(market_data)
+market_data = MarketData(BinanceApi().get_symbol_to_base_quote_mapping())
+petronius_arbiter = PetroniusArbiter(market_data)
 bl = BinanceDataListener(market_data)
 
 if __name__ == "__main__":
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     arby_thread.start()
 
     # _run_web()
-    server.run(debug=True)
+    # server.run(debug=True)
 
     listener_thread.join()
     arby_thread.join()

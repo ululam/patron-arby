@@ -9,5 +9,7 @@ BINANCE_API_SECRET = os.environ.get(
     "BINANCE_SECRET", "s4Rc93YjDGylGSuVJ2eFq5APWtL1mTUwsJ3KRKYSHx7w6uzxuksK2xaEv2kw4Ika"
 )
 BINANCE_API_URL = os.environ.get(
-    "BINANCE_API_URL", "https://api.binance.com"
+    "BINANCE_API_URL", "https://api.binance.com/api"
 )
+
+BINANCE_WEB_SOCKET_URL = "binance.com"
