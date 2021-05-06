@@ -19,8 +19,8 @@ class PetroniusArbiter:
     @log_execution_time
     def find(self) -> List[Dict]:
         log.info(" =========== Starting find cycle")
-        data = self.market_data.get()
-        if len(data) == 0:
+        price_volume_data = self.market_data.get()
+        if len(price_volume_data) == 0:
             log.warning("No data present yet, skipping finding arbitrage")
             return list()
 
@@ -29,43 +29,27 @@ class PetroniusArbiter:
         # todo Optimize: don't calculate if no new tickers arrived (remember last update time for ticker in market_data)
         for coin_a, coin_ba_paths in market_paths.items():
             for coin_b_market in coin_ba_paths:
-                if coin_b_market not in data:
-                    # No ticker arrived yet
+                coin_ba_price, coin_ba_quantity, coin_b = self._find_coin_b_via_a(coin_a=coin_a,
+                    coin_b_market=coin_b_market, price_volume_data=price_volume_data)
+                if not coin_ba_price:
                     continue
-                coin_ba_price, coin_ba_quantity, coin_b = self._get_coin_data(coin_b_market, coin_a, data)
-                self._print_buy_info(coin_a, coin_b, coin_ba_price, coin_ba_quantity)
 
                 coin_bc_paths = market_paths.get(coin_b)
                 if not coin_bc_paths:
                     # No further paths
                     continue
+
                 for coin_c_market in coin_bc_paths:
-                    if coin_c_market == coin_b_market:
-                        # Avoid circular paths with depth 1
-                        continue
-                    if coin_c_market not in data:
-                        # No ticker arrived yet
+                    coin_cb_price, coin_cb_quantity, coin_c = self._find_coin_c_via_b(coin_b=coin_b,
+                        coin_b_market=coin_b_market, coin_c_market=coin_c_market, price_volume_data=price_volume_data)
+                    if not coin_cb_price:
                         continue
 
-                    coin_cb_price, coin_cb_quantity, coin_c = self._get_coin_data(coin_c_market, coin_b, data)
-                    self._print_buy_info(coin_b, coin_c, coin_cb_price, coin_cb_quantity)
-
-                    # Return to coin A
-                    coin_a_market_fwd = f"{coin_c}/{coin_a}"
-                    coin_a_market_reverse = f"{coin_a}/{coin_c}"
-                    if coin_a_market_fwd == coin_c_market or coin_a_market_reverse == coin_c_market:
+                    coin_ac_price, coin_ac_quantity = self._find_coin_a_via_c(coin_c=coin_c, coin_a=coin_a,
+                        coin_c_market=coin_c_market, price_volume_data=price_volume_data)
+                    if not coin_ac_price:
+                        # No path to A via C
                         continue
-                    if coin_a_market_fwd in data.keys():
-                        coin_a_market = coin_a_market_fwd
-                    elif coin_a_market_reverse in data.keys():
-                        coin_a_market = coin_a_market_reverse
-                    else:
-                        # Path not present
-                        continue
-
-                    coin_ac_price, coin_ac_quantity = \
-                        self._get_coin_price_and_quantity_in_another_coin(data.get(coin_a_market), coin_a)
-                    self._print_buy_info(coin_c, coin_a, coin_ac_price, coin_ac_quantity)
 
                     max_coin_a_volume_available = self._calculate_max_available_triangle_volume(
                         (coin_ba_price, coin_ba_quantity),
@@ -74,7 +58,6 @@ class PetroniusArbiter:
                     )
 
                     roi = self._calculate_triangle_roi(coin_ba_price, coin_cb_price, coin_ac_price)
-
                     profit = max_coin_a_volume_available * roi
 
                     result.append({
@@ -89,6 +72,49 @@ class PetroniusArbiter:
 
         log.info(" =========== End find cycle")
         return result
+
+    def _find_coin_b_via_a(self, coin_a: str, coin_b_market: str, price_volume_data: Dict):
+        if coin_b_market not in price_volume_data:
+            # No ticker arrived yet
+            return None, None, None
+        coin_ba_price, coin_ba_quantity, coin_b = self._get_coin_data(coin_b_market, coin_a, price_volume_data)
+        self._print_buy_info(coin_a, coin_b, coin_ba_price, coin_ba_quantity)
+
+        return coin_ba_price, coin_ba_quantity, coin_b
+
+    def _find_coin_c_via_b(self, coin_b: str, coin_b_market: str, coin_c_market: str, price_volume_data: Dict):
+        if coin_c_market == coin_b_market:
+            # Avoid circular paths with depth 1
+            return None, None, None
+        if coin_c_market not in price_volume_data:
+            # No ticker arrived yet
+            return None, None, None
+
+        coin_cb_price, coin_cb_quantity, coin_c = self._get_coin_data(coin_c_market, coin_b, price_volume_data)
+        self._print_buy_info(coin_b, coin_c, coin_cb_price, coin_cb_quantity)
+
+        return coin_cb_price, coin_cb_quantity, coin_c
+
+    def _find_coin_a_via_c(self, coin_c: str, coin_a: str, coin_c_market: str, price_volume_data: Dict):
+        # Return to coin A
+        coin_a_market_fwd = f"{coin_c}/{coin_a}"
+        coin_a_market_reverse = f"{coin_a}/{coin_c}"
+        if coin_a_market_fwd == coin_c_market or coin_a_market_reverse == coin_c_market:
+            # Avoid circular path
+            return None, None
+        if coin_a_market_fwd in price_volume_data.keys():
+            coin_a_market = coin_a_market_fwd
+        elif coin_a_market_reverse in price_volume_data.keys():
+            coin_a_market = coin_a_market_reverse
+        else:
+            # Path not present. No return to first coin
+            return None, None
+
+        coin_ac_price, coin_ac_quantity = \
+            self._get_coin_price_and_quantity_in_another_coin(price_volume_data.get(coin_a_market), coin_a)
+        self._print_buy_info(coin_c, coin_a, coin_ac_price, coin_ac_quantity)
+
+        return coin_ac_price, coin_ac_quantity
 
     @staticmethod
     def _calculate_max_available_triangle_volume(coin_ba_price_volume: Tuple[float, float],
