@@ -118,7 +118,7 @@ class PetroniusArbiter:
         return coin_cb_price, coin_cb_quantity, coin_c
 
     def _calc_move_back_to_coin_a(self, coin_c: str, coin_a: str, coin_ac_market: str, price_volume_data: Dict)\
-            -> Union[Tuple[float, float, str]]:
+            -> Union[Tuple[float, float]]:
         """
         :param coin_c:
         :param coin_a:
