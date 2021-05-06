@@ -33,9 +33,12 @@ class BinanceApi:
         ei = self.client.get_exchange_info()
         return [market.get('symbol') for market in ei.get("symbols")]
 
-    def get_trading_commissions(self):
-        pass
+    def get_arbitrage_commission(self) -> float:
+        account_info = self.client.get_account()
+        return account_info.get("takerCommission") * 0.001
 
 
 if __name__ == '__main__':
     api = BinanceApi()
+    commissions = api.get_arbitrage_commission()
+    print(commissions)

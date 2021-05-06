@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.decorators import log_execution_time
@@ -12,13 +12,20 @@ class PetroniusArbiter:
     Responsible for find triangle arbitrage in market data
     """
 
-    def __init__(self, market_data: MarketData) -> None:
+    def __init__(self, market_data: MarketData, default_order_fee_factor: float = 0.01) -> None:
         super().__init__()
         self.market_data = market_data
+        self.default_order_fee_factor = default_order_fee_factor
 
     @log_execution_time
-    def find(self) -> List[Dict]:
+    def find(self, order_fee_factor: float = None) -> List[Dict]:
+        """
+        Finds arbitrage paths
+        :param order_fee_factor: Order placement factor (percent * 0.01)
+        :return: List of triangle paths with ROI, profit, and available volume
+        """
         log.info(" =========== Starting find cycle")
+        order_fee_factor = order_fee_factor if order_fee_factor else self.default_order_fee_factor
         price_volume_data = self.market_data.get()
         if len(price_volume_data) == 0:
             log.warning("No data present yet, skipping finding arbitrage")
@@ -29,8 +36,8 @@ class PetroniusArbiter:
         # todo Optimize: don't calculate if no new tickers arrived (remember last update time for ticker in market_data)
         for coin_a, coin_ba_paths in market_paths.items():
             for coin_b_market in coin_ba_paths:
-                coin_ba_price, coin_ba_quantity, coin_b = self._find_coin_b_via_a(coin_a=coin_a,
-                    coin_b_market=coin_b_market, price_volume_data=price_volume_data)
+                coin_ba_price, coin_ba_quantity, coin_b = self._calc_move_to_coin_b(coin_a=coin_a,
+                    coin_ba_market=coin_b_market, price_volume_data=price_volume_data)
                 if not coin_ba_price:
                     continue
 
@@ -40,13 +47,13 @@ class PetroniusArbiter:
                     continue
 
                 for coin_c_market in coin_bc_paths:
-                    coin_cb_price, coin_cb_quantity, coin_c = self._find_coin_c_via_b(coin_b=coin_b,
-                        coin_b_market=coin_b_market, coin_c_market=coin_c_market, price_volume_data=price_volume_data)
+                    coin_cb_price, coin_cb_quantity, coin_c = self._calc_move_to_coin_c(coin_b=coin_b,
+                        coin_ba_market=coin_b_market, coin_cb_market=coin_c_market, price_volume_data=price_volume_data)
                     if not coin_cb_price:
                         continue
 
-                    coin_ac_price, coin_ac_quantity = self._find_coin_a_via_c(coin_c=coin_c, coin_a=coin_a,
-                        coin_c_market=coin_c_market, price_volume_data=price_volume_data)
+                    coin_ac_price, coin_ac_quantity = self._calc_move_back_to_coin_a(coin_c=coin_c,
+                        coin_a=coin_a, coin_ac_market=coin_c_market, price_volume_data=price_volume_data)
                     if not coin_ac_price:
                         # No path to A via C
                         continue
@@ -73,33 +80,56 @@ class PetroniusArbiter:
         log.info(" =========== End find cycle")
         return result
 
-    def _find_coin_b_via_a(self, coin_a: str, coin_b_market: str, price_volume_data: Dict):
-        if coin_b_market not in price_volume_data:
+    def _calc_move_to_coin_b(self, coin_a: str, coin_ba_market: str, price_volume_data: Dict) \
+            -> Union[Tuple[float, float, str]]:
+        """
+        :param coin_a: Name of initial coin
+        :param coin_ba_market: Trading symbol "COINB/COINA" (or COINA/COINB)
+        :param price_volume_data: Ticker data from market_data
+        :return: Tuple [Price of coin_b in coins_a, available coin_b volume, coin_b itself]
+        """
+        if coin_ba_market not in price_volume_data:
             # No ticker arrived yet
             return None, None, None
-        coin_ba_price, coin_ba_quantity, coin_b = self._get_coin_data(coin_b_market, coin_a, price_volume_data)
+        coin_ba_price, coin_ba_quantity, coin_b = self._get_coin_data(coin_ba_market, coin_a, price_volume_data)
         self._print_buy_info(coin_a, coin_b, coin_ba_price, coin_ba_quantity)
 
         return coin_ba_price, coin_ba_quantity, coin_b
 
-    def _find_coin_c_via_b(self, coin_b: str, coin_b_market: str, coin_c_market: str, price_volume_data: Dict):
-        if coin_c_market == coin_b_market:
+    def _calc_move_to_coin_c(self, coin_b: str, coin_ba_market: str, coin_cb_market: str, price_volume_data: Dict)\
+            -> Union[Tuple[float, float, str]]:
+        """
+        :param coin_b: Name of the second coin in the chain
+        :param coin_ba_market: Trading symbol "COINB/COINA" (or COINA/COINB)
+        :param coin_cb_market: Trading symbol "COINC/COINB" (or COINB/COINC)
+        :param price_volume_data: Ticker data from market_data
+        :return: Tuple [Price of coin_c in coins_b, available coin_c volume, coin_c itself]
+        """
+        if coin_cb_market == coin_ba_market:
             # Avoid circular paths with depth 1
             return None, None, None
-        if coin_c_market not in price_volume_data:
+        if coin_cb_market not in price_volume_data:
             # No ticker arrived yet
             return None, None, None
 
-        coin_cb_price, coin_cb_quantity, coin_c = self._get_coin_data(coin_c_market, coin_b, price_volume_data)
+        coin_cb_price, coin_cb_quantity, coin_c = self._get_coin_data(coin_cb_market, coin_b, price_volume_data)
         self._print_buy_info(coin_b, coin_c, coin_cb_price, coin_cb_quantity)
 
         return coin_cb_price, coin_cb_quantity, coin_c
 
-    def _find_coin_a_via_c(self, coin_c: str, coin_a: str, coin_c_market: str, price_volume_data: Dict):
+    def _calc_move_back_to_coin_a(self, coin_c: str, coin_a: str, coin_ac_market: str, price_volume_data: Dict)\
+            -> Union[Tuple[float, float, str]]:
+        """
+        :param coin_c:
+        :param coin_a:
+        :param coin_ac_market:
+        :param price_volume_data:
+        :return: Tuple [Price of coin_a in coins_c, available coin_a volume]
+        """
         # Return to coin A
         coin_a_market_fwd = f"{coin_c}/{coin_a}"
         coin_a_market_reverse = f"{coin_a}/{coin_c}"
-        if coin_a_market_fwd == coin_c_market or coin_a_market_reverse == coin_c_market:
+        if coin_a_market_fwd == coin_ac_market or coin_a_market_reverse == coin_ac_market:
             # Avoid circular path
             return None, None
         if coin_a_market_fwd in price_volume_data.keys():
@@ -143,7 +173,9 @@ class PetroniusArbiter:
 
     def _get_coin_data(self, coin_market: str, previous_coin: str, market_data: Dict) -> Tuple[float, float, str]:
         base_quote = coin_market.split("/")
-        assert base_quote[0] == previous_coin or base_quote[1] == previous_coin
+        if not previous_coin:
+            print()
+        assert base_quote[0] == previous_coin or base_quote[1] == previous_coin, f"{previous_coin} not in {base_quote}"
         coin = base_quote[0] if base_quote[1] == previous_coin else base_quote[1]
         coin_price_in_prev_coin, quantity = \
             self._get_coin_price_and_quantity_in_another_coin(market_data.get(coin_market), coin)

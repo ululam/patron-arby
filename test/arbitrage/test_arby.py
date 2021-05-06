@@ -76,7 +76,7 @@ class TestArby(TestCase):
         # 2. Act
         result = arby.find()
 
-        result.sort(key=lambda val: -float(val.get("profit")))
+        result.sort(key=lambda val: -float(val.get("roi")))
         print(result)
 
         # 3. Assert

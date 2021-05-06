@@ -56,8 +56,9 @@ def run_arbitrage():
         petronius_arbiter.find()
 
 
-market_data = MarketData(BinanceApi().get_symbol_to_base_quote_mapping())
-petronius_arbiter = PetroniusArbiter(market_data)
+binance_api = BinanceApi()
+market_data = MarketData(binance_api.get_symbol_to_base_quote_mapping())
+petronius_arbiter = PetroniusArbiter(market_data, binance_api.get_arbitrage_commission())
 bl = BinanceDataListener(market_data)
 
 if __name__ == "__main__":
