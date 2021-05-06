@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from unittest import TestCase
 
 from patron_arby.arbitrage.arby import PetroniusArbiter
@@ -82,11 +83,12 @@ class TestArby(TestCase):
         # no exceptions
 
     def _load_market_data(self):
-        with open("test/arbitrage/symbol_to_base_quote_coins.json", "r") as f:
+        path_to_current_dir = os.path.dirname(os.path.realpath(__file__))
+        with open(f"{path_to_current_dir}/symbol_to_base_quote_coins.json", "r") as f:
             symbol_to_base_quote_coins = json.load(f)
         market_data = MarketData(symbol_to_base_quote_coins)
 
-        with open("test/arbitrage/bidasks.json", "r") as f:
+        with open(f"{path_to_current_dir}/bidasks.json", "r") as f:
             market_data.data = json.load(f)
 
         return market_data
