@@ -173,9 +173,8 @@ class PetroniusArbiter:
 
     def _get_coin_data(self, coin_market: str, previous_coin: str, market_data: Dict) -> Tuple[float, float, str]:
         base_quote = coin_market.split("/")
-        if not previous_coin:
-            print()
-        assert base_quote[0] == previous_coin or base_quote[1] == previous_coin, f"{previous_coin} not in {base_quote}"
+        # assert base_quote[0] == previous_coin or base_quote[1] == previous_coin, f"{previous_coin} not in {
+        # base_quote}"
         coin = base_quote[0] if base_quote[1] == previous_coin else base_quote[1]
         coin_price_in_prev_coin, quantity = \
             self._get_coin_price_and_quantity_in_another_coin(market_data.get(coin_market), coin)
@@ -196,16 +195,21 @@ class PetroniusArbiter:
         else:
             raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
 
+        # bid = float(bidask_dict.get("BestBid"))
+        # ask = float(bidask_dict.get("BestAsk"))    # bid < ask
+
+        # bid_quantity = float(bidask_dict.get("BestBidQuantity"))
+        # ask_quantity = float(bidask_dict.get("BestAskQuantity"))
+
+        if forward_buy:
+            ask = float(bidask_dict.get("BestAsk"))    # bid < ask
+            ask_quantity = float(bidask_dict.get("BestAskQuantity"))
+            return ask * (1 + self.default_order_fee_factor), ask_quantity
+
         bid = float(bidask_dict.get("BestBid"))
-        ask = float(bidask_dict.get("BestAsk"))    # bid < ask
-
         bid_quantity = float(bidask_dict.get("BestBidQuantity"))
-        ask_quantity = float(bidask_dict.get("BestAskQuantity"))
-
-        price = ask * (1 + self.default_order_fee_factor) if forward_buy \
-            else 1 / (bid * (1 - self.default_order_fee_factor))
-        quantity = ask_quantity if forward_buy else bid_quantity / price
-
+        price = 1 / (bid * (1 - self.default_order_fee_factor))
+        quantity = bid_quantity / price
         return price, quantity
 
     def _print_buy_info(self, coin_1: str, coin_2: str, coin_21_price: float, coin_21_quantity: float):

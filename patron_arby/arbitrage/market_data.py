@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, List, Tuple
 
 from patron_arby.common.util import current_time_ms
+
+log = logging.getLogger(__name__)
 
 
 class MarketData:
@@ -28,6 +31,8 @@ class MarketData:
             self.markets.append(symbol)
         self.coins = list(coins_set)
         self.symbol_to_base_quote_coins = symbol_to_base_quote_coins
+
+        log.info(f"Total coins: {len(self.coins)}. Total markets (symbols): {len(self.markets)}")
 
     def _add_to_market_paths(self, coin: str, market: str):
         if coin not in self.market_paths:
