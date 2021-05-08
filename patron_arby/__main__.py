@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import threading
@@ -57,17 +56,10 @@ def get_market_data():
 
 
 def run_arbitrage():
-    counter = 0
     while True:
         time.sleep(5)
-        counter += 1
-        data = market_data.get()
-        if counter > 30:
-            print("Dumping market data")
-            with open("bidasks.json", "w") as f:
-                json.dump(data, f)
-
         result = petronius_arbiter.find()
+        result = petronius_arbiter.find3()
         if len(result) == 0:
             continue
         log.info(f"Total 3-chains: {len(result)}")
@@ -81,7 +73,7 @@ def run_arbitrage():
             for pr in positive_result:
                 log.info(pr)
                 f.write(f"{pr}\n")
-
+        log.info("$$$$$$$$")
         log.info("$$$$$$$$")
 
 
