@@ -15,7 +15,7 @@ repos:
     language: system
     entry: pipenv run flake8
     types: [python]
-    exclude: settings.py
+    exclude: (settings.py|__init*|test_arby.py)
 
 # AZ: Disable as too annoying
 #  - id: mypy
