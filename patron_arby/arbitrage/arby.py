@@ -195,12 +195,6 @@ class PetroniusArbiter:
         else:
             raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
 
-        # bid = float(bidask_dict.get("BestBid"))
-        # ask = float(bidask_dict.get("BestAsk"))    # bid < ask
-
-        # bid_quantity = float(bidask_dict.get("BestBidQuantity"))
-        # ask_quantity = float(bidask_dict.get("BestAskQuantity"))
-
         if forward_buy:
             ask = float(bidask_dict.get("BestAsk"))    # bid < ask
             ask_quantity = float(bidask_dict.get("BestAskQuantity"))

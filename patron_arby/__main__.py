@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import threading
@@ -56,8 +57,16 @@ def get_market_data():
 
 
 def run_arbitrage():
+    counter = 0
     while True:
-        time.sleep(1)
+        time.sleep(5)
+        counter += 1
+        data = market_data.get()
+        if counter > 30:
+            print("Dumping market data")
+            with open("bidasks.json", "w") as f:
+                json.dump(data, f)
+
         result = petronius_arbiter.find()
         if len(result) == 0:
             continue
@@ -68,8 +77,11 @@ def run_arbitrage():
             log.info(f"PETRONIUS ARBITER found no profit. Best ROI is {result[0]}")
             continue
         log.info("$$$$$$$$ PETRONIUS ARBITER")
-        for pr in positive_result:
-            log.info(pr)
+        with open("arbitrage.plus", "a") as f:
+            for pr in positive_result:
+                log.info(pr)
+                f.write(f"{pr}\n")
+
         log.info("$$$$$$$$")
 
 

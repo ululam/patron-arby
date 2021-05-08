@@ -5,6 +5,7 @@ from unittest import TestCase
 
 from patron_arby.arbitrage.arby import PetroniusArbiter
 from patron_arby.arbitrage.market_data import MarketData
+from patron_arby.settings import *
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class TestArby(TestCase):
         result = arby.find()
 
         result.sort(key=lambda val: -float(val.get("roi")))
-        print(result)
+        # print(result)
 
         # 3. Assert
         # no exceptions

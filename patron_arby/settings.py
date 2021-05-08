@@ -6,7 +6,7 @@ from .config.prod import *
 
 LOG_FORMAT = "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
 
-logging.basicConfig(level=logging.WARN, format=LOG_FORMAT)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 logger = logging.getLogger("patron_arby")
 logger.setLevel(logging.DEBUG)

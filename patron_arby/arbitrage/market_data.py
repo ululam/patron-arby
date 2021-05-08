@@ -11,6 +11,8 @@ class MarketData:
     coins: List = []
     markets: List = []
     market_paths: Dict = {}
+    # Market -> last updated time
+    market_update_times: Dict = {}
 
     def __init__(self, symbol_to_base_quote_coins: Dict[str, str]) -> None:
         """
@@ -47,8 +49,15 @@ class MarketData:
 
         symbol, record = self._to_record(data_event)
         self.data[symbol] = record
+        self.market_update_times[symbol] = current_time_ms()
 
     def get_market_paths(self):
+        return self.market_paths
+
+    def get_market_paths_only_updated_since(self, since_time_ms: int):
+        """
+        :return: Dictionary of only those market paths which have been updated since given time
+        """
         return self.market_paths
 
     def get_coins(self) -> List[str]:
@@ -56,6 +65,10 @@ class MarketData:
 
     def get_markets(self) -> List[str]:
         return self.markets
+
+    def get_market_last_update_time_ms(self, market: str):
+        last_update_time = self.market_update_times.get(market)
+        return last_update_time if last_update_time else 0
 
     def _to_record(self, data_event: Dict) -> Tuple[str, Dict]:
         data = data_event["data"]
