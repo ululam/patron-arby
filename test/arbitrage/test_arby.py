@@ -75,8 +75,6 @@ class TestArby(TestCase):
         arby = PetroniusArbiter(self._load_market_data(), 0.01)
 
         # 2. Act
-        # result = arby.find()
-        result = arby.find3()
         result = arby.find()
 
         result.sort(key=lambda val: -float(val.get("roi")))

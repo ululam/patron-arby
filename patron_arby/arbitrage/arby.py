@@ -21,66 +21,10 @@ class PetroniusArbiter:
 
     @log_execution_time
     def find(self) -> List[Dict]:
-        log.debug(" =========== Starting find cycle")
+        log.fine(" =========== Starting find cycle")
         price_volume_data = self.market_data.get()
         if len(price_volume_data) == 0:
-            log.warning("No data present yet, skipping finding arbitrage")
-            return list()
-
-        result = list()
-        for coins_path, markets_path in self.market_data.paths_3.items():
-            coins = coins_path.split(COINS_PATH_SEPARATOR)
-            markets = markets_path.split(COINS_PATH_SEPARATOR)
-
-            bidask_ba_dict = price_volume_data.get(markets[0])
-            if not bidask_ba_dict:  # or bidask_ba_dict.get("LastUpdateTimeMs") < self.previous_run_time:
-                continue
-            bidask_cb_dict = price_volume_data.get(markets[1])
-            if not bidask_cb_dict:  # or bidask_cb_dict.get("LastUpdateTimeMs") < self.previous_run_time:
-                continue
-            bidask_ac_dict = price_volume_data.get(markets[2])
-            if not bidask_ac_dict:  # or bidask_ac_dict.get("LastUpdateTimeMs") < self.previous_run_time:
-                continue
-
-            coin_ba_price, coin_ba_quantity = \
-                self._get_coin_price_and_quantity_in_another_coin(bidask_ba_dict, coins[1])
-            if not coin_ba_price:
-                continue
-            coin_cb_price, coin_cb_quantity = \
-                self._get_coin_price_and_quantity_in_another_coin(bidask_cb_dict, coins[2])
-            if not coin_cb_price:
-                continue
-            coin_ac_price, coin_ac_quantity = \
-                self._get_coin_price_and_quantity_in_another_coin(bidask_ac_dict, coins[3])
-            if not coin_ac_price:
-                continue
-
-            max_coin_a_volume_available = self._calculate_max_available_triangle_volume(
-                (coin_ba_price, coin_ba_quantity),
-                (coin_cb_price, coin_cb_quantity),
-                (coin_ac_price, coin_ac_quantity)
-            )
-
-            roi = self._calculate_triangle_roi(coin_ba_price, coin_cb_price, coin_ac_price)
-            profit = max_coin_a_volume_available * roi
-
-            result.append({
-                "coin_path": coins_path,
-                "market_path": markets_path,
-                "roi": roi,
-                "profit": profit
-            })
-
-        self.previous_run_time = current_time_ms()
-        log.debug(" =========== End find cycle")
-        return result
-
-    @log_execution_time
-    def find3(self) -> List[Dict]:
-        log.debug(" =========== Starting find cycle")
-        price_volume_data = self.market_data.get()
-        if len(price_volume_data) == 0:
-            log.warning("No data present yet, skipping finding arbitrage")
+            log.info("No data present yet, skipping finding arbitrage")
             return list()
 
         result = list()
@@ -115,14 +59,17 @@ class PetroniusArbiter:
             profit = max_coin_a_volume_available * roi
 
             result.append({
+                "market": markets[0],
                 "coin_path": coins_path,
                 "market_path": markets_path,
                 "roi": roi,
-                "profit": profit
+                "profit": profit,
+                "timems": current_time_ms()
             })
 
         self.previous_run_time = current_time_ms()
-        log.debug(" =========== End find cycle")
+        log.fine(" =========== End find cycle")
+
         return result
 
     @staticmethod

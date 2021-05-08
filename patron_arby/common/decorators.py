@@ -5,7 +5,7 @@ from functools import wraps
 
 from patron_arby.common.util import current_time_ms
 
-log = logging.getLogger(os.path.basename(__file__))
+log = logging.getLogger("patron_arby.decorators")
 
 
 def safely(func: callable):
@@ -36,7 +36,7 @@ def log_execution_time(func: callable):
     def wrapper(*args, **kwargs):
         start = current_time_ms()
         result = func(*args, **kwargs)
-        log.info(f"Executed {_obj_name(func)}::{func.__name__}() in {(current_time_ms() - start)} ms")
+        log.debug(f"Executed {_obj_name(func)}::{func.__name__}() in {(current_time_ms() - start)} ms")
         return result
 
     return wrapper
