@@ -1,19 +1,8 @@
 from dataclasses import dataclass
-from enum import Enum
 from typing import Dict, List
 
+from patron_arby.common.order import OrderSide
 from patron_arby.common.util import current_time_ms, dict_from_obj, obj_from_dict
-
-
-class OrderSide(Enum):
-    SELL = "SELL"
-    BUY = "BUY"
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.__str__()
 
 
 @dataclass(frozen=True)
@@ -51,7 +40,7 @@ class AChain:
     timems: int = current_time_ms()
 
     def uid(self) -> str:
-        return f"{[v.market.replace('/', '') for v in self.steps]}_{self.timems}"
+        return f"{'-'.join([s.market.replace('/', '') for s in self.steps])}_{self.timems}"
 
     def is_for_same_chain(self, ac) -> bool:
         if not ac:

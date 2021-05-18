@@ -4,6 +4,7 @@ import threading
 from patron_arby.common.bus import Bus
 from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
+from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.exchange_api import ExchangeApi
 
 log = logging.getLogger(__name__)
@@ -13,14 +14,15 @@ SENTINEL_MESSAGE = "SHUTDOWN"
 
 # todo Refactor to async IO mode
 class OrderExecutor(threading.Thread):
-    def __init__(self, bus: Bus, exchange_api: ExchangeApi) -> None:
+    def __init__(self, bus: Bus, exchange_api: ExchangeApi, order_dao: OrderDao) -> None:
         """
-        :param fire_orders_queue: Queue to take orders from
+        :param bus: Message bus
         :param exchange_api:  ExchangeApi. Be careful, and create 1 API instance per thread if its not thread-safe
         """
         super().__init__()
         self.bus = bus
         self.exchange_api = exchange_api
+        self.order_dao = order_dao
 
     def _post_order(self, o: Order):
         log.info(f"Placing order {o}")
@@ -45,7 +47,14 @@ class OrderExecutor(threading.Thread):
                       f"Got {msg}, skipping")
             return False
 
-        self._post_order(msg)
+        order: Order = msg
+        # Fire first
+        self._post_order(order)
+        # Then, save.
+        # todo Possible race condition (if we got a status update from exchange BEFORE or DURING next line
+        # invocation. Highly improbable, but still possible
+        # self.order_dao.put_order(order)
+
         return False
 
     def _on_sentinel(self):

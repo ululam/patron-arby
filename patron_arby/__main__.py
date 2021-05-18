@@ -11,11 +11,12 @@ from patron_arby.common.decorators import measure_execution_time, safely
 from patron_arby.config.base import ARBITRAGE_COINS
 from patron_arby.config.staging import PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL
 from patron_arby.db.arbitrage_dao import ArbitrageDao
+from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.binance.api import BinanceApi
 from patron_arby.exchange.binance.listener import BinanceDataListener
+from patron_arby.exchange.binance.order_listener import BinanceOrderListener
 from patron_arby.order.executor import OrderExecutor
 from patron_arby.order.manager import OrderManager
-from patron_arby.order.order_listener import OrderListener
 
 log = logging.getLogger("patron_arby.main")
 
@@ -58,7 +59,7 @@ class Main:
     @measure_execution_time
     def save_profitable_arbitrage(self, positive_result: List[Dict]):
         for pr in positive_result:
-            self.dao.put_profitable_arbitrage(pr)
+            self.arbitrage_dao.put_profitable_arbitrage(pr)
 
     def save_top_arbitrage(self, chains: List[AChain]):
         chains.sort(key=lambda val: -val.profit_usd)
@@ -80,19 +81,21 @@ class Main:
         self.petronius_arbiter = PetroniusArbiter(market_data, binance_api.get_trade_fees(),
             binance_api.get_default_trade_fee())
 
-        self.dao = ArbitrageDao()
+        self.arbitrage_dao = ArbitrageDao()
 
         order_manager = OrderManager(bus)
+
+        order_dao = OrderDao()
 
         order_executors: List[OrderExecutor] = list()
         for i in range(0, 3):
             # todo API KEYS
-            order_executors.append(OrderExecutor(bus, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL)))
+            order_executors.append(
+                OrderExecutor(bus, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL), order_dao))
 
-        orders_listener = OrderListener(bus)
+        orders_listener = BinanceOrderListener(bus, order_dao)
 
-        bl = BinanceDataListener(market_data, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL),
-            set(market_data.markets))
+        bl = BinanceDataListener(market_data, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL))
         bl.add_event_listener(orders_listener)
 
         listener_thread = threading.Thread(target=bl.run)
@@ -106,9 +109,9 @@ class Main:
             exec.start()
         # data_writer_thread.start()
 
-        listener_thread.join()
-        arby_thread.join()
-        order_manager.join()
+        # listener_thread.join()
+        # arby_thread.join()
+        # order_manager.join()
         # data_writer_thread.join()
 
 

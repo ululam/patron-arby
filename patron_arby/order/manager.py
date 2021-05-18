@@ -73,8 +73,9 @@ class OrderManager(threading.Thread):
             client_order_id = f"{OrderManager._hash8(chain)}_order_{index}"
             price = OrderManager._calc_break_even_price(step, chain)
             symbol = step.market.replace("/", "")
-            order = Order(client_order_id=client_order_id, order_side=step.side.name, symbol=symbol,
+            order = Order(client_order_id=client_order_id, order_side=step.side, symbol=symbol,
                 quantity=step.volume, price=price)
+            order.arbitrage_id = chain.uid()
             order_list.append(order)
 
         return order_list

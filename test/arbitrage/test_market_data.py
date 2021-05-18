@@ -8,7 +8,8 @@ from patron_arby.config.base import ARBITRAGE_COINS
 
 
 class TestMarketData(TestCase):
-    @skip
+    # todo Fix
+    @skip("Fails during commit hook, but works fine if run standalone")
     def test__limit_coins(self):
         # 1. Arrange & act
         market_data = self._load_market_data(["BUSD", "BTC"])
