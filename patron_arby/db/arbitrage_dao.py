@@ -4,7 +4,7 @@ from typing import Dict, List
 
 import boto3
 
-from patron_arby.common.decorators import log_execution_time, safely
+from patron_arby.common.decorators import measure_execution_time, safely
 
 
 class ArbitrageDao:
@@ -19,7 +19,7 @@ class ArbitrageDao:
         )
 
     @safely
-    @log_execution_time
+    @measure_execution_time
     def put_arbitrage_records(self, arbitrages_list: List[Dict]):
         records = [{"Data": json.dumps(r)} for r in arbitrages_list]
         self.firehose.put_record_batch(

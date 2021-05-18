@@ -1,8 +1,8 @@
 import logging
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from patron_arby.arbitrage.market_data import COINS_PATH_SEPARATOR, MarketData
-from patron_arby.common.decorators import log_execution_time
+from patron_arby.common.chain import AChain, AChainStep, OrderSide
 from patron_arby.common.util import current_time_ms
 
 log = logging.getLogger(__name__)
@@ -13,14 +13,15 @@ class PetroniusArbiter:
     Responsible for find triangle arbitrage in market data
     """
 
-    def __init__(self, market_data: MarketData, default_order_fee_factor: float = 0.01) -> None:
+    def __init__(self, market_data: MarketData, trade_fees: Dict, default_trade_fee: float = 0.001) -> None:
         super().__init__()
         self.market_data = market_data
-        self.default_order_fee_factor = default_order_fee_factor
         self.previous_run_time = 0
+        self.fees = trade_fees
+        self.default_fee = default_trade_fee
 
-    @log_execution_time
-    def find(self) -> List[Dict]:
+    # @measure_execution_time
+    def find(self, on_positive_arbitrage_found_callback: Callable[[AChain], None] = None) -> List[AChain]:
         log.fine(" =========== Starting find cycle")
         price_volume_data = self.market_data.get()
         if len(price_volume_data) == 0:
@@ -32,50 +33,58 @@ class PetroniusArbiter:
             coins = coins_path.split(COINS_PATH_SEPARATOR)
             markets = markets_path.split(COINS_PATH_SEPARATOR)
 
-            coin_xy_price_quantity = list()
             valid_3_chain = True
+            steps: List[AChainStep] = list()
             for i in range(0, len(markets)):
                 bidask_dict = price_volume_data.get(markets[i])
                 if not bidask_dict:  # or bidask_dict.get("LastUpdateTimeMs") < self.previous_run_time:
                     valid_3_chain = False
                     break
-                coin_xy_price, coin_xy_quantity = \
-                    self._get_coin_price_and_quantity_in_another_coin(bidask_dict, coins[i + 1])
-                if not coin_xy_price:
-                    valid_3_chain = False
-                    break
-                coin_xy_price_quantity.append((coin_xy_price, coin_xy_quantity))
+                step = self._get_coin_price_and_quantity_in_another_coin(bidask_dict, coins[i + 1])
+                steps.append(step)
 
             if not valid_3_chain:
                 continue
 
-            max_coin_a_volume_available = self._calculate_max_available_triangle_volume(
-                coin_xy_price_quantity[0], coin_xy_price_quantity[1], coin_xy_price_quantity[2]
-            )
+            # roi, profit = self._calc_roi_and_profit(coin_xy_price_quantity)
+            roi, profit = self._calc_roi_and_profit(steps)
+            profit_usd = self._get_profit_in_usd(coins[0], profit)
 
-            roi = self._calculate_triangle_roi(
-                coin_xy_price_quantity[0][0], coin_xy_price_quantity[1][0], coin_xy_price_quantity[2][0]
-            )
-            profit = max_coin_a_volume_available * roi
+            chain = AChain(initial_coin=coins[0], initial_market=markets[0], steps=steps, roi=roi, profit=profit,
+                profit_usd=profit_usd)
 
-            result.append({
-                "market": markets[0],
-                "coin_path": coins_path,
-                "market_path": markets_path,
-                "roi": roi,
-                "profit": profit,
-                "timems": current_time_ms()
-            })
+            if profit > 0:
+                log.debug(f"Found positive arbitrage chain: {chain}")
+                if on_positive_arbitrage_found_callback:
+                    on_positive_arbitrage_found_callback(chain)
+
+            result.append(chain)
 
         self.previous_run_time = current_time_ms()
         log.fine(" =========== End find cycle")
 
         return result
 
+    def update_commissions(self, commissions: Dict):
+        self.fees = commissions
+
+    def _calc_roi_and_profit(self, steps: List[AChainStep]) -> Tuple[float, float]:
+        roi = self._calculate_triangle_roi(steps[0], steps[1], steps[2])
+
+        max_coin_a_volume_for_chain = self._calc_max_available_triangle_volume(steps[0], steps[1], steps[2])
+
+        profit = max_coin_a_volume_for_chain * roi
+
+        return roi, profit
+
+    def _calc_usd_profit(self, chain: AChain):
+        pass
+
+    def _get_trade_fee(self, market: str) -> float:
+        return self.fees.get(market, self.default_fee)
+
     @staticmethod
-    def _calculate_max_available_triangle_volume(coin_ba_price_volume: Tuple[float, float],
-                                                 coin_cb_price_volume: Tuple[float, float],
-                                                 coin_ac_price_volume: Tuple[float, float]) -> float:
+    def _calc_max_available_triangle_volume(step1: AChainStep, step2: AChainStep, step3: AChainStep) -> float:
         """
         :param coin_ba_price_volume: [price, volume_available] for coin_b in coin_a units
         :param coin_cb_price_volume: [price, volume_available] for coin_c in coin_b units
@@ -83,20 +92,29 @@ class PetroniusArbiter:
         :return: Maximum available volume of coin_a we can trade in the given chain [a -> b -> c -> a]
         """
         # Bring all the volumes to the same unit
-        coin_ba_in_a_volume = coin_ba_price_volume[0] * coin_ba_price_volume[1]
-        coin_cb_in_a_volume = coin_cb_price_volume[0] * coin_cb_price_volume[1] * coin_ba_price_volume[0]
-        coin_ac_in_a_volume = coin_ac_price_volume[1]
+        # coin_ba_in_a_volume = coin_ba_price_volume[0] * coin_ba_price_volume[1]
+        coin_ba_in_a_volume = step1.price * step1.volume
+        # coin_cb_in_a_volume = coin_cb_price_volume[0] * coin_cb_price_volume[1] * coin_ba_price_volume[0]
+        coin_cb_in_a_volume = step2.price * step2.volume * step1.price
+        # coin_ac_in_a_volume = coin_ac_price_volume[1]
+        coin_ac_in_a_volume = step3.volume
+
         return min(coin_ba_in_a_volume, coin_cb_in_a_volume, coin_ac_in_a_volume)
 
     @staticmethod
-    def _calculate_triangle_roi(*prices):
+    def _calculate_triangle_roi(*steps):
         factor = 1
-        for p in prices:
-            factor = factor * p
+        for step in steps:
+            factor = factor * (step.price if step.is_buy() else 1 / step.price)
         return 1 - factor
 
     def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) \
-            -> Tuple[float, float]:
+            -> AChainStep:
+        """
+        :param bidask_dict:
+        :param coin:
+        :return: [price, volume, True if BUY, False if SELL]
+        """
         market = bidask_dict.get("Market")
 
         base_quote = market.split("/")
@@ -107,17 +125,30 @@ class PetroniusArbiter:
         else:
             raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
 
+        trade_fee = self._get_trade_fee(market.replace("/", ""))
+        # trade_fee = self._get_trade_fee(market)
+
         if forward_buy:
             ask = bidask_dict.get("BestAsk")    # bid < ask
             ask_quantity = bidask_dict.get("BestAskQuantity")
-            return ask * (1 + self.default_order_fee_factor), ask_quantity
+            return AChainStep(market, OrderSide.BUY, price=ask * (1 + trade_fee),
+                volume=ask_quantity)
 
         bid = bidask_dict.get("BestBid")
         bid_quantity = bidask_dict.get("BestBidQuantity")
-        price = 1 / (bid * (1 - self.default_order_fee_factor))
-        quantity = bid_quantity / price
+        price = bid * (1 - trade_fee)
+        quantity = bid_quantity * price
 
-        return price, quantity
+        return AChainStep(market, OrderSide.SELL, price=price, volume=quantity)
+
+    def _get_profit_in_usd(self, coin: str, volume: float):
+        if "USD" in coin:
+            return volume
+        coin_price_in_usd = self.market_data.get_coin_price_in_usd(coin)
+        if not coin_price_in_usd:
+            log.fine(f"USD price for coin '{coin}' not found")
+            return -1
+        return volume * coin_price_in_usd
 
     def _print_buy_info(self, coin_1: str, coin_2: str, coin_21_price: float, coin_21_quantity: float):
         if log.isEnabledFor(logging.FINE):

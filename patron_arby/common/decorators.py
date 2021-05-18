@@ -25,7 +25,7 @@ def safely(func: callable):
     return wrapper
 
 
-def log_execution_time(func: callable):
+def measure_execution_time(func: callable):
     """
     Executes the given function logging time execution
     :param func: function reference

@@ -12,4 +12,8 @@ BINANCE_API_URL = os.environ.get(
     "BINANCE_API_URL", "https://testnet.binance.vision/api"
 )
 
+PAPER_API_KEY = BINANCE_API_KEY
+PAPER_API_SECRET = BINANCE_API_SECRET
+PAPER_API_URL = BINANCE_API_URL
+
 BINANCE_WEB_SOCKET_URL = "binance.com-testnet"
