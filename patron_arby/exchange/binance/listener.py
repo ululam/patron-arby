@@ -8,13 +8,10 @@ from unicorn_binance_websocket_api.unicorn_binance_websocket_api_manager import 
 )
 
 from patron_arby.arbitrage.market_data import MarketData
-from patron_arby.exchange.binance.api import BinanceApi
+from patron_arby.db.keys_provider import KeysProvider
+from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.exchange_event_listener import ExchangeEventListener
-from patron_arby.settings import (
-    BINANCE_API_KEY,
-    BINANCE_API_SECRET,
-    BINANCE_WEB_SOCKET_URL,
-)
+from patron_arby.settings import BINANCE_WEB_SOCKET_URL
 
 log = logging.getLogger(__name__)
 
@@ -31,21 +28,18 @@ class BinanceDataListener:
     event_listeners: Set[ExchangeEventListener] = set()
 
     # Todo Replace MarketData with Bus
-    def __init__(self, market_data: MarketData, binance_api: BinanceApi, markets: Set[str] = None) -> None:
+    def __init__(self, market_data: MarketData, keys_provider: KeysProvider, markets: Set[str]) -> None:
         super().__init__()
         self.market_data = market_data
-        self.binance_api = binance_api
+        self.keys_provider = keys_provider
         self.markets = markets
 
     def run(self):
         self.ws_manager = BinanceWebSocketApiManager(exchange=BINANCE_WEB_SOCKET_URL)
 
-        if not self.markets:
-            self.markets = self.binance_api.get_all_markets()
-
         log.info(f"Totally markets: {len(self.markets)}")
 
-        self._create_streams(self.markets)
+        self._create_streams(list(self.markets))
         self._create_account_stream()
 
         while True:
@@ -89,9 +83,7 @@ class BinanceDataListener:
                 i += 1
 
     def _create_account_stream(self):
-        # todo Replace
-        binance_api_key, binance_api_secret = BINANCE_API_KEY, BINANCE_API_SECRET
-
+        binance_api_key, binance_api_secret = self.keys_provider.get_exchange_api_keys(Binance.NAME)
         self.ws_manager.create_stream(
             ["!userData"],
             ["arr"],  # Means "single stream for all"

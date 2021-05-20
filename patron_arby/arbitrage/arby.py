@@ -53,7 +53,8 @@ class PetroniusArbiter:
 
             # Update volumes according to max available volume
 
-            chain = AChain(initial_coin=coins[0], steps=steps, roi=roi, profit=profit, profit_usd=profit_usd)
+            chain = AChain(initial_coin=steps[0].spending_coin(), steps=steps, roi=roi, profit=profit,
+                profit_usd=profit_usd)
 
             if profit > 0:
                 log.debug(f"Found positive arbitrage chain: {chain}")
@@ -91,7 +92,7 @@ class PetroniusArbiter:
 
     def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) -> AChainStep:
         """
-        :param bidask_dict:
+        :param bidask_dict: Ticker
         :param coin:
         :return: [price, volume, True if BUY, False if SELL]
         """
@@ -101,7 +102,7 @@ class PetroniusArbiter:
         if coin == base_quote[0]:
             forward_buy = True      # We buy our coin using other coin as base
         elif coin == base_quote[1]:
-            forward_buy = False     # Our coin is baee, we should reverse price
+            forward_buy = False     # Our coin is base, we are "selling"
         else:
             raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
 
@@ -110,8 +111,7 @@ class PetroniusArbiter:
         if forward_buy:
             ask = bidask_dict.get("BestAsk")    # bid < ask
             ask_quantity = bidask_dict.get("BestAskQuantity")
-            return AChainStep(market, OrderSide.BUY, price=ask * (1 + trade_fee),
-                volume=ask_quantity)
+            return AChainStep(market, OrderSide.BUY, price=ask * (1 + trade_fee), volume=ask_quantity)
 
         bid = bidask_dict.get("BestBid")
         bid_quantity = bidask_dict.get("BestBidQuantity")

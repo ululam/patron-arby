@@ -13,20 +13,23 @@ class ArbyUtils:
         :return: Steps wth max available volume set
         """
         if step1.volume == 0 or step2.volume == 0 or step3.volume == 0:
-            return ArbyUtils._return_all_zeros(step1, step2, step3)
+            step1.volume = 0
+            step2.volume = 0
+            step3.volume = 0
+            return step1, step2, step3
 
         # How many coins A we have at market1?
-        coinA_volume_market1 = ArbyUtils._get_what_we_propose_volume(step1)
+        coinA_volume_market1 = step1.get_what_we_propose_volume()
         # That corresponds to the following number of coins B
-        coinB_volume_market1 = ArbyUtils._get_what_we_get_volume(step1)
+        coinB_volume_market1 = step1.get_what_we_get_volume()
 
         # Market 2: Convert volume to coinA
-        coinB_volume_market2 = ArbyUtils._get_what_we_propose_volume(step2)
-        coinC_volume_market2 = ArbyUtils._get_what_we_get_volume(step2)
+        coinB_volume_market2 = step2.get_what_we_propose_volume()
+        coinC_volume_market2 = step2.get_what_we_get_volume()
         coinA_volume_market2 = coinB_volume_market2 * (coinA_volume_market1 / coinB_volume_market1)
 
         # Market 3: Convert volume to coinA
-        coinC_volume_market3 = ArbyUtils._get_what_we_propose_volume(step3)
+        coinC_volume_market3 = step3.get_what_we_propose_volume()
         coinB_volume_market3 = coinC_volume_market3 * (coinB_volume_market2 / coinC_volume_market2)
         coinA_volume_market3 = coinB_volume_market3 * (coinA_volume_market1 / coinB_volume_market1)
 
@@ -34,30 +37,16 @@ class ArbyUtils:
         coinA_max_available = min(coinA_volume_market1, coinA_volume_market2, coinA_volume_market3)
 
         # Now, adjust all the steps volumes
-        step1 = ArbyUtils._adjust_step_volume(step1, coinA_max_available)
+        step1.volume = ArbyUtils._adjust_step_volume(step1, coinA_max_available)
 
-        coinB_after_step1 = ArbyUtils._get_what_we_get_volume(step1)
-        step2 = ArbyUtils._adjust_step_volume(step2, coinB_after_step1)
+        coinB_after_step1 = step1.get_what_we_get_volume()
+        step2.volume = ArbyUtils._adjust_step_volume(step2, coinB_after_step1)
 
-        coinC_after_step2 = ArbyUtils._get_what_we_get_volume(step2)
-        step3 = ArbyUtils._adjust_step_volume(step3, coinC_after_step2)
+        coinC_after_step2 = step2.get_what_we_get_volume()
+        step3.volume = ArbyUtils._adjust_step_volume(step3, coinC_after_step2)
 
         return step1, step2, step3
 
     @staticmethod
     def _adjust_step_volume(step: AChainStep, prev_step_coin_volume: float):
-        step2_volume = prev_step_coin_volume / step.price if step.is_buy() else prev_step_coin_volume
-        return step.clone_with_volume(step2_volume)
-
-    @staticmethod
-    def _return_all_zeros(step1: AChainStep, step2: AChainStep, step3: AChainStep) -> \
-            Tuple[AChainStep, AChainStep, AChainStep]:
-        return step1.clone_with_volume(0), step2.clone_with_volume(0), step3.clone_with_volume(0)
-
-    @staticmethod
-    def _get_what_we_propose_volume(step: AChainStep) -> float:
-        return step.volume * step.price if step.is_buy() else step.volume
-
-    @staticmethod
-    def _get_what_we_get_volume(step: AChainStep) -> float:
-        return step.volume if step.is_buy() else step.volume * step.price
+        return prev_step_coin_volume / step.price if step.is_buy() else prev_step_coin_volume

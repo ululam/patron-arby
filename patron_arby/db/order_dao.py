@@ -29,9 +29,11 @@ class OrderDao:
     def put_order(self, order: Order):
         prev_order = self.get_order(order.client_order_id)
         if prev_order:
-            order.updated_at = current_time_ms()
             prev_order_dict = prev_order.to_dict()
-            prev_order_dict.update(order.to_dict())
+            # Preserve/set values explicitly
+            prev_order_dict["created_at"] = prev_order.created_at
+            prev_order_dict["updated_at"] = current_time_ms()
+            prev_order_dict["arbitrage_id"] = prev_order.arbitrage_id if prev_order.arbitrage_id else order.arbitrage_id
             return self.table.put_item(
                 Item=self._convert_floats_to_decimals(prev_order_dict)
             )

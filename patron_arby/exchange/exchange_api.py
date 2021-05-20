@@ -29,6 +29,13 @@ class ExchangeApi(ABC):
         pass
 
     @abc.abstractmethod
+    def get_balances(self) -> Dict[str, float]:
+        """
+        :return: {coin -> balance}
+        """
+        pass
+
+    @abc.abstractmethod
     def put_order(self, o: Order) -> object:
         """
         Puts the given order to the market

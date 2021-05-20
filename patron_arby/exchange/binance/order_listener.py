@@ -22,9 +22,11 @@ class BinanceOrderListener(ExchangeEventListener):
         if event.get(Binance.EVENT_KEY_TYPE) != "executionReport":
             return
 
+        log.debug(f"Got order event {event}")
+
         order = self.converter.convert(event)
 
-        log.info(f"Got notification that order {order.client_order_id} changed tp status {order.status}")
+        log.info(f"Got notification that order {order.client_order_id} changed to status {order.status}")
 
         self.order_dao.put_order(order)
 
@@ -33,7 +35,7 @@ class BinanceOrderListener(ExchangeEventListener):
 
     def on_order_executed(self, order: Order):
         # Not a super solution, but there's a strong hope we won't run into hundreds of running arbitrage chains
-        for chain, order_ids in self.bus.running_orders_storage.items():
-            if order.client_order_id in order_ids:
-                order_ids.remove(order.client_order_id)
-                break
+        chain_hash0 = order.client_order_id.split("_")[0]
+        running_order_ids = self.bus.running_orders_storage[chain_hash0]
+        if running_order_ids:
+            running_order_ids.remove(order.client_order_id)

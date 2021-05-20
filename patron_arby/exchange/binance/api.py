@@ -6,8 +6,9 @@ from binance.client import Client
 from binance.enums import SIDE_BUY, SIDE_SELL
 
 from patron_arby.common.order import Order
+from patron_arby.db.keys_provider import KeysProvider
+from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.exchange_api import ExchangeApi
-from patron_arby.settings import BINANCE_API_KEY, BINANCE_API_SECRET
 
 log = logging.getLogger(__name__)
 
@@ -16,9 +17,8 @@ QUANTIZE_PATTERN = Decimal("1.00000000")
 
 
 class BinanceApi(ExchangeApi):
-    def __init__(self, api_key: str = BINANCE_API_KEY, api_secret: str = BINANCE_API_SECRET, api_url: str = None) \
-            -> None:
-        self.client = Client(api_key, api_secret)
+    def __init__(self, keys_provider: KeysProvider, api_url: str = None) -> None:
+        self.client = Client(*keys_provider.get_exchange_api_keys(Binance.NAME))
         if api_url:
             log.info(f"Setting API URL = {api_url}")
             self.client.API_URL = api_url
@@ -47,6 +47,10 @@ class BinanceApi(ExchangeApi):
         acc = self.client.get_account()
         commission = acc.get("takerCommission")
         return float(commission) * 0.0001
+
+    def get_balances(self) -> Dict[str, float]:
+        account = self.client.get_account()
+        return {bal["asset"]: float(bal["free"]) for bal in account.get("balances")}
 
     def put_order(self, o: Order) -> Dict:
         log.debug(f"Placing order with order client id = {o.client_order_id}")

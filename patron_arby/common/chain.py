@@ -1,16 +1,23 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from patron_arby.common.order import OrderSide
 from patron_arby.common.util import current_time_ms, dict_from_obj, obj_from_dict
 
 
-@dataclass(frozen=True)
+@dataclass(init=False, repr=False)
 class AChainStep:
     market: str
     side: OrderSide
     price: float
     volume: float
+
+    def __init__(self, market: str, side: OrderSide, price: float, volume: float) -> None:
+        super().__init__()
+        self.market = market
+        self.side = side
+        self.price = price
+        self.volume = volume
 
     def is_buy(self) -> bool:
         return self.side == OrderSide.BUY
@@ -20,15 +27,36 @@ class AChainStep:
         d["side"] = self.side.name
         return d
 
+    def spending_coin(self) -> Optional[str]:
+        """
+        :return: Which coin we ACTUALLY sell at this step
+        E.g. if BTC/USDT and side = BUY, we spend USDTs; if side = SELL, we spend BTCs
+        """
+        coins = self.market.split("/")
+        if len(coins) != 2:
+            return None
+        return coins[1] if self.is_buy() else coins[0]
+
+    def get_what_we_propose_volume(self) -> float:
+        """
+        :return: Volume of the coin which we actually spend in this step
+        """
+        return self.volume * self.price if self.is_buy() else self.volume
+
+    def get_what_we_get_volume(self) -> float:
+        """
+        :return: Volume of the coin which we actually obtain in this step
+        """
+        return self.volume if self.is_buy() else self.volume * self.price
+
     @staticmethod
     def from_dict(d: Dict):
-        return AChainStep(d["market"], OrderSide(d["side"]), float(d["price"]), float(d["volume"]))
-
-    def clone_with_volume(self, new_volume: float):
-        return AChainStep(market=self.market, side=self.side, price=self.price, volume=new_volume)
+        o = obj_from_dict(d, AChainStep("", OrderSide.BUY, 0, 0))
+        o.side = OrderSide(o.side)
+        return o
 
     def __str__(self):
-        return f"[{self.market}, {self.side}, {self.price}, {self.volume}]"
+        return f"[{self.side} {self.volume} {self.market} @ {self.price}]"
 
 
 @dataclass

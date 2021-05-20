@@ -1,4 +1,5 @@
 class Binance:
+    NAME = "binance"
     # https://github.com/binance-us/binance-official-api-docs/blob/master/user-data-stream.md#order-update
     EVENT_KEY_TYPE = "e"
 
@@ -8,5 +9,7 @@ class Binance:
     EVENT_KEY_QUANTITY = "q"
     EVENT_KEY_PRICE = "p"
     EVENT_KEY_CLIENT_ORDER_ID = "c"
+    EVENT_KEY_ORIGINAL_CLIENT_ORDER_ID = "C"
 
     ORDER_STATUS_FILLED = "FILLED"
+    ORDER_STATUS_CANCELLED = "CANCELLED"

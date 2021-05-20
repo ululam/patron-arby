@@ -29,7 +29,13 @@ class OrderExecutor(threading.Thread):
 
     def _post_order(self, o: Order):
         log.info(f"Placing order {o}")
-        result = self.exchange_api.put_order(o)
+        try:
+            result = self.exchange_api.put_order(o)
+        except Exception as ex:
+            # Add log line to identify which order failed
+            log.error(f"Error placing order {o}: {ex}")
+            self._remove_order_from_running(o)
+            raise ex
         log.info(f"Got order result {result}")
 
     def run(self):
@@ -60,6 +66,12 @@ class OrderExecutor(threading.Thread):
             self.order_dao.put_order(order)
 
         return False
+
+    def _remove_order_from_running(self, o: Order):
+        chain_hash0 = o.client_order_id.split("_")[0]
+        running_orders = self.bus.running_orders_storage[chain_hash0]
+        if running_orders:
+            running_orders.remove(o.client_order_id)
 
     def _on_sentinel(self):
         log.debug(f"Got {SENTINEL_MESSAGE}, stopping")

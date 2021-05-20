@@ -7,26 +7,6 @@ from patron_arby.common.order import OrderSide
 
 class TestArbyUtils(TestCase):
 
-    def test___get_what_we_propose_volume__buy_step(self):
-        step = AChainStep("BTCUSDT", OrderSide.BUY, 50_000, 3)
-        we_propose_volume = ArbyUtils._get_what_we_propose_volume(step)
-        eq(150_000, we_propose_volume)        # We give 150_000 USD
-
-    def test___get_what_we_propose_volume__sell_step(self):
-        step = AChainStep("BTCUSDT", OrderSide.SELL, 50_000, 3)
-        we_propose_volume = ArbyUtils._get_what_we_propose_volume(step)
-        eq(3, we_propose_volume)        # We give 3 BTC
-
-    def test__get_what_we_get_volume__buy_step(self):
-        step = AChainStep("ETHBTC", OrderSide.BUY, 0.05, 40)
-        we_get_volume = ArbyUtils._get_what_we_get_volume(step)
-        eq(40, we_get_volume)        # We get 40 ETH
-
-    def test__get_what_we_get_volume__sell_step(self):
-        step = AChainStep("ETHBTC", OrderSide.SELL, 0.05, 40)
-        we_get_volume = ArbyUtils._get_what_we_get_volume(step)
-        eq(2, we_get_volume)         # We get 2 BTC
-
     def test__calc_and_set_max_available_triangle_volume__all_buys(self):
         # 1. Arrange
         step1 = AChainStep("BTCUSDT", OrderSide.BUY, 50_000, 2)
