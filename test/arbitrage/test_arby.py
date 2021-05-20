@@ -1,6 +1,6 @@
 import json
 from typing import List
-from unittest import TestCase
+from unittest import TestCase, skip
 
 from patron_arby.arbitrage.arby import PetroniusArbiter
 from patron_arby.arbitrage.market_data import MarketData
@@ -89,6 +89,7 @@ class TestArby(TestCase):
         self.assertEqual(bidask.get("BestAsk") * 1.1, step_btc.price)
         self.assertEqual(bidask.get("BestBid") * 0.9, step_usdt.price)
 
+    @skip
     def test__find_using_real_market_snapshot(self):
         # 1. Arrange
         arby = PetroniusArbiter(self._load_market_data(), {})
@@ -102,11 +103,6 @@ class TestArby(TestCase):
 
         # 3. Assert
         # no exceptions
-
-    def test__commissions(self):
-        # todo Implement commissions tests
-        pass
-
     def _load_market_data(self, limit_to_coins: List[str] = None):
         symbol_to_base_quote_coins, bidasks = self._load_local_jsons()
         market_data = MarketData(symbol_to_base_quote_coins, limit_to_coins)

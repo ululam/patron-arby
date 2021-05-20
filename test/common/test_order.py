@@ -4,7 +4,7 @@ from patron_arby.common.order import Order, OrderSide
 
 
 class TestOrder(TestCase):
-    def test__to_dict(self):
+    def test__to_from_dict(self):
         # 1. Arrange
         o = Order("asd", OrderSide.SELL, "BTCETH", 0.01, 0.2)
         o.original_order = {"original": {"a": 1}}

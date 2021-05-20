@@ -16,11 +16,11 @@ QUANTIZE_PATTERN = Decimal("1.00000000")
 
 
 class BinanceApi(ExchangeApi):
-    def __init__(self, api_key: str = BINANCE_API_KEY, api_secret: str = BINANCE_API_SECRET,
-                 api_url: str = None) -> None:
+    def __init__(self, api_key: str = BINANCE_API_KEY, api_secret: str = BINANCE_API_SECRET, api_url: str = None) \
+            -> None:
         self.client = Client(api_key, api_secret)
         if api_url:
-            log.info(f"Setting API ULR = {api_url}")
+            log.info(f"Setting API URL = {api_url}")
             self.client.API_URL = api_url
 
     def get_exchange_info(self):
@@ -49,12 +49,9 @@ class BinanceApi(ExchangeApi):
         return float(commission) * 0.0001
 
     def put_order(self, o: Order) -> Dict:
-        if o.order_side not in [SIDE_BUY, SIDE_SELL]:
-            raise AttributeError(f"Unsupported order side {o.order_side}")
-
         log.debug(f"Placing order with order client id = {o.client_order_id}")
         order = self.client.order_limit(
-            side=o.order_side,
+            side=SIDE_BUY if o.is_buy() else SIDE_SELL,
             symbol=o.symbol,
             quantity=self._norm(o.quantity),
             price=self._norm(o.price),
@@ -72,10 +69,4 @@ class BinanceApi(ExchangeApi):
         :param f:
         :return:
         """
-        return Decimal.from_float(f).quantize(QUANTIZE_PATTERN)
-
-
-if __name__ == '__main__':
-    api = BinanceApi()
-    commissions = api.client.get_trade_fee(symbol="BTCUSDT")
-    print(commissions)
+        return Decimal.from_float(float(f)).quantize(QUANTIZE_PATTERN)

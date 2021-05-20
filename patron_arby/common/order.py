@@ -35,7 +35,7 @@ class Order:
         :param client_order_id: Our trade client id
         :param order_side: BUY | SELL
         :param symbol: Trading pair symbol
-        :param quantity:
+        :param volume:
         :param price:
         :return: Placed order dictionary
         """
@@ -49,10 +49,16 @@ class Order:
     def __str__(self) -> str:
         return dict_from_obj(self).__str__()
 
+    def is_buy(self) -> bool:
+        return self.order_side == OrderSide.BUY
+
     def to_dict(self):
-        return dict_from_obj(self)
+        d = dict_from_obj(self)
+        d["order_side"] = self.order_side.name if self.order_side else None
+        return d
 
     @staticmethod
     def from_dict(order_dict: Dict):
         o = obj_from_dict(order_dict, Order(None, None, "", 0, 0))
+        o.order_side = OrderSide[o.order_side] if o.order_side else None
         return o

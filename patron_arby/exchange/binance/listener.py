@@ -31,8 +31,7 @@ class BinanceDataListener:
     event_listeners: Set[ExchangeEventListener] = set()
 
     # Todo Replace MarketData with Bus
-    def __init__(self, market_data: MarketData, binance_api: BinanceApi = BinanceApi(),
-                 markets: Set[str] = None) -> None:
+    def __init__(self, market_data: MarketData, binance_api: BinanceApi, markets: Set[str] = None) -> None:
         super().__init__()
         self.market_data = market_data
         self.binance_api = binance_api

@@ -1,6 +1,7 @@
 import logging
 from typing import Callable, Dict, List, Tuple
 
+from patron_arby.arbitrage.arby_utils import ArbyUtils
 from patron_arby.arbitrage.market_data import COINS_PATH_SEPARATOR, MarketData
 from patron_arby.common.chain import AChain, AChainStep, OrderSide
 from patron_arby.common.util import current_time_ms
@@ -47,11 +48,12 @@ class PetroniusArbiter:
                 continue
 
             # roi, profit = self._calc_roi_and_profit(coin_xy_price_quantity)
-            roi, profit = self._calc_roi_and_profit(steps)
+            steps, roi, profit = self._calc_and_set_roi_profit_and_max_volume(steps)
             profit_usd = self._get_profit_in_usd(coins[0], profit)
 
-            chain = AChain(initial_coin=coins[0], initial_market=markets[0], steps=steps, roi=roi, profit=profit,
-                profit_usd=profit_usd)
+            # Update volumes according to max available volume
+
+            chain = AChain(initial_coin=coins[0], steps=steps, roi=roi, profit=profit, profit_usd=profit_usd)
 
             if profit > 0:
                 log.debug(f"Found positive arbitrage chain: {chain}")
@@ -68,38 +70,17 @@ class PetroniusArbiter:
     def update_commissions(self, commissions: Dict):
         self.fees = commissions
 
-    def _calc_roi_and_profit(self, steps: List[AChainStep]) -> Tuple[float, float]:
+    def _calc_and_set_roi_profit_and_max_volume(self, steps: List[AChainStep]) -> Tuple[List[AChainStep], float, float]:
         roi = self._calculate_triangle_roi(steps[0], steps[1], steps[2])
 
-        max_coin_a_volume_for_chain = self._calc_max_available_triangle_volume(steps[0], steps[1], steps[2])
+        step1, step2, step3 = ArbyUtils.calc_and_return_max_available_triangle_volume(steps[0], steps[1], steps[2])
 
-        profit = max_coin_a_volume_for_chain * roi
+        profit = step1.volume * roi
 
-        return roi, profit
-
-    def _calc_usd_profit(self, chain: AChain):
-        pass
+        return [step1, step2, step3], roi, profit
 
     def _get_trade_fee(self, market: str) -> float:
         return self.fees.get(market, self.default_fee)
-
-    @staticmethod
-    def _calc_max_available_triangle_volume(step1: AChainStep, step2: AChainStep, step3: AChainStep) -> float:
-        """
-        :param coin_ba_price_volume: [price, volume_available] for coin_b in coin_a units
-        :param coin_cb_price_volume: [price, volume_available] for coin_c in coin_b units
-        :param coin_ac_price_volume: [price, volume_available] for coin_a in coin_c units
-        :return: Maximum available volume of coin_a we can trade in the given chain [a -> b -> c -> a]
-        """
-        # Bring all the volumes to the same unit
-        # coin_ba_in_a_volume = coin_ba_price_volume[0] * coin_ba_price_volume[1]
-        coin_ba_in_a_volume = step1.price * step1.volume
-        # coin_cb_in_a_volume = coin_cb_price_volume[0] * coin_cb_price_volume[1] * coin_ba_price_volume[0]
-        coin_cb_in_a_volume = step2.price * step2.volume * step1.price
-        # coin_ac_in_a_volume = coin_ac_price_volume[1]
-        coin_ac_in_a_volume = step3.volume
-
-        return min(coin_ba_in_a_volume, coin_cb_in_a_volume, coin_ac_in_a_volume)
 
     @staticmethod
     def _calculate_triangle_roi(*steps):
@@ -108,8 +89,7 @@ class PetroniusArbiter:
             factor = factor * (step.price if step.is_buy() else 1 / step.price)
         return 1 - factor
 
-    def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) \
-            -> AChainStep:
+    def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) -> AChainStep:
         """
         :param bidask_dict:
         :param coin:
@@ -126,7 +106,6 @@ class PetroniusArbiter:
             raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
 
         trade_fee = self._get_trade_fee(market.replace("/", ""))
-        # trade_fee = self._get_trade_fee(market)
 
         if forward_buy:
             ask = bidask_dict.get("BestAsk")    # bid < ask
@@ -137,7 +116,9 @@ class PetroniusArbiter:
         bid = bidask_dict.get("BestBid")
         bid_quantity = bidask_dict.get("BestBidQuantity")
         price = bid * (1 - trade_fee)
+        # todo Fix for SELL
         quantity = bid_quantity * price
+        # quantity = bid_quantity / price
 
         return AChainStep(market, OrderSide.SELL, price=price, volume=quantity)
 

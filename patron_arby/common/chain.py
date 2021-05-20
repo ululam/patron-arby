@@ -24,6 +24,9 @@ class AChainStep:
     def from_dict(d: Dict):
         return AChainStep(d["market"], OrderSide(d["side"]), float(d["price"]), float(d["volume"]))
 
+    def clone_with_volume(self, new_volume: float):
+        return AChainStep(market=self.market, side=self.side, price=self.price, volume=new_volume)
+
     def __str__(self):
         return f"[{self.market}, {self.side}, {self.price}, {self.volume}]"
 
@@ -31,8 +34,6 @@ class AChainStep:
 @dataclass
 class AChain:
     initial_coin: str = None
-    initial_market: str = None
-    # todo Calculate base on market_path
     steps: List[AChainStep] = None
     roi: float = 0
     profit: float = 0
@@ -50,9 +51,14 @@ class AChain:
                 return False
         return True
 
+    @property
+    def initial_market(self):
+        return self.steps[0].market
+
     def to_dict(self):
         d = dict_from_obj(self)
         d["steps"] = [s.to_dict() for s in self.steps]
+        d["uid"] = self.uid()
         return d
 
     def to_chain(self) -> str:

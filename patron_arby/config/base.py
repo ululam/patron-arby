@@ -4,4 +4,4 @@ RUN_ARBITRAGE_SEARCH_PERIOD_MS = 100
 ARBITRAGE_COINS = {"USDT", "DOGE", "EUR", "BTC", "BUSD", "ETH", "BNB"}  # "TRY"
 
 # If profit is less than that value, USD, we don't put arbitrage orders
-ORDER_PROFIT_THRESHOLD_USD = 1
+ORDER_PROFIT_THRESHOLD_USD = 0.1

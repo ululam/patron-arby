@@ -1,4 +1,5 @@
 import time
+from decimal import Decimal
 from typing import Dict
 
 
@@ -14,3 +15,7 @@ def obj_from_dict(d: Dict, obj):
     for k, v in d.items():
         setattr(obj, k, v)
     return obj
+
+
+def to_decimal(f: float, decimal_pattern: Decimal = Decimal("1.00000000")):
+    return Decimal.from_float(float(f)).quantize(decimal_pattern)

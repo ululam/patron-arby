@@ -1,13 +1,14 @@
 import logging
 import threading
 import time
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from patron_arby.arbitrage.arby import PetroniusArbiter
 from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain
 from patron_arby.common.decorators import measure_execution_time, safely
+from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.config.base import ARBITRAGE_COINS
 from patron_arby.config.staging import PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL
 from patron_arby.db.arbitrage_dao import ArbitrageDao
@@ -26,7 +27,7 @@ bus = Bus()
 class Main:
     def run_arbitrage(self):
         # Wait some time for data to come
-        time.sleep(1)
+        time.sleep(3)
 
         exec_count = 0
         while True:
@@ -35,7 +36,7 @@ class Main:
             result = self.petronius_arbiter.find(self.on_positive_arbitrage_found_callback)
             exec_count += 1
             if exec_count % 100 == 0:
-                print(f"Ran arbitrage {exec_count} times")
+                log.info(f"Ran arbitrage {exec_count} times")
             if len(result) == 0:
                 continue
 
@@ -74,28 +75,47 @@ class Main:
         #     while not arbitrage_record_queue.empty():
         #         self.dao.put_arbitrage_records(arbitrage_record_queue.get())
 
-    def main(self):
-        binance_api = BinanceApi()
-        market_data = MarketData(binance_api.get_symbol_to_base_quote_mapping(), only_coins=ARBITRAGE_COINS)
+    def _build_exchange_limitations(self, binance_exchange_info: Dict) -> Dict:
+        limits = dict()
+        for s in binance_exchange_info.get('symbols'):
+            market = s.get("symbol")
+            limits[market] = dict()
+            filters = s.get("filters")
+            for f in filters:
+                if f.get("filterType") == "PRICE_FILTER":
+                    limits[market][ExchangeLimitation.MIN_PRICE_STEP] = self._remote_trailing_zeros(f.get("tickSize"))
+                elif f.get("filterType") == "LOT_SIZE":
+                    limits[market][ExchangeLimitation.MIN_VOLUME_STEP] = self._remote_trailing_zeros(f.get("stepSize"))
 
-        self.petronius_arbiter = PetroniusArbiter(market_data, binance_api.get_trade_fees(),
-            binance_api.get_default_trade_fee())
+        return limits
+
+    @staticmethod
+    def _remote_trailing_zeros(str_float: Union[str, float]) -> str:
+        return str(float(str_float))
+
+    def main(self, prod_binance_api: BinanceApi = BinanceApi(),
+             put_orders_binance_api: BinanceApi = BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL)):
+        market_data = MarketData(prod_binance_api.get_symbol_to_base_quote_mapping(), only_coins=ARBITRAGE_COINS)
+
+        self.petronius_arbiter = PetroniusArbiter(market_data, prod_binance_api.get_trade_fees(),
+            prod_binance_api.get_default_trade_fee())
 
         self.arbitrage_dao = ArbitrageDao()
 
-        order_manager = OrderManager(bus)
+        order_manager = OrderManager(bus, self._build_exchange_limitations(prod_binance_api.get_exchange_info()),
+            self.arbitrage_dao)
 
         order_dao = OrderDao()
 
         order_executors: List[OrderExecutor] = list()
-        for i in range(0, 3):
+        for i in range(0, 1):
             # todo API KEYS
             order_executors.append(
-                OrderExecutor(bus, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL), order_dao))
+                OrderExecutor(bus, put_orders_binance_api, order_dao))
 
         orders_listener = BinanceOrderListener(bus, order_dao)
 
-        bl = BinanceDataListener(market_data, BinanceApi(PAPER_API_KEY, PAPER_API_SECRET, PAPER_API_URL))
+        bl = BinanceDataListener(market_data, prod_binance_api)
         bl.add_event_listener(orders_listener)
 
         listener_thread = threading.Thread(target=bl.run)

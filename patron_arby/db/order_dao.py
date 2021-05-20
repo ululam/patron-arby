@@ -17,6 +17,8 @@ class OrderDao:
     def get_order(self, client_order_id: str) -> Optional[Order]:
         try:
             record = self.table.get_item(Key={"client_order_id": client_order_id})
+            if not record.get("Item"):
+                return None
             return Order.from_dict(record.get("Item"))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
@@ -31,7 +33,7 @@ class OrderDao:
             prev_order_dict = prev_order.to_dict()
             prev_order_dict.update(order.to_dict())
             return self.table.put_item(
-                Item=prev_order
+                Item=self._convert_floats_to_decimals(prev_order_dict)
             )
 
         order.created_at = current_time_ms()

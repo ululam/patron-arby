@@ -11,8 +11,11 @@ log = logging.getLogger(__name__)
 
 SENTINEL_MESSAGE = "SHUTDOWN"
 
+LOCK = threading.Lock()
+
 
 # todo Refactor to async IO mode
+# todo That will require async binance REST API impl
 class OrderExecutor(threading.Thread):
     def __init__(self, bus: Bus, exchange_api: ExchangeApi, order_dao: OrderDao) -> None:
         """
@@ -38,7 +41,7 @@ class OrderExecutor(threading.Thread):
         log.debug("Ending")
 
     @safely
-    def _process(self, msg):
+    def _process(self, msg) -> bool:
         if msg == SENTINEL_MESSAGE:
             return self._on_sentinel()
 
@@ -53,7 +56,8 @@ class OrderExecutor(threading.Thread):
         # Then, save.
         # todo Possible race condition (if we got a status update from exchange BEFORE or DURING next line
         # invocation. Highly improbable, but still possible
-        # self.order_dao.put_order(order)
+        with LOCK:
+            self.order_dao.put_order(order)
 
         return False
 
