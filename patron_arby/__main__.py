@@ -96,7 +96,7 @@ class Main:
     def _remote_trailing_zeros(str_float: Union[str, float]) -> str:
         return str(float(str_float))
 
-    def main(self, keys_provider: KeysProvider = None):
+    def main(self, keys_provider: KeysProvider = KeysProvider()):
         self.binance_api = BinanceApi(keys_provider)
         market_data = MarketData(self.binance_api.get_symbol_to_base_quote_mapping(), only_coins=ARBITRAGE_COINS)
 
