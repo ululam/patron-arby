@@ -26,14 +26,10 @@ jobs:
       - run: pipenv run flake8 --exclude="*settings.py,*__init__.py,*test_arby.py"
       - run: pipenv run pytest --cov --cov-fail-under=30
 
-  docker-image:
+  test-build-docker-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
       - name: Build docker image
         run: docker build . -t patron_arby:test
-
-      - name: Smoke test docker image
-        run: |
-          docker run --rm patron_arby:test 10
