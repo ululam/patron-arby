@@ -1,14 +1,16 @@
 import json
 import logging
 import math
-from typing import Dict, List, Union
+from typing import Dict, List, Set, Union
 
 from unicorn_binance_websocket_api.unicorn_binance_websocket_api_manager import (
     BinanceWebSocketApiManager,
 )
 
 from patron_arby.arbitrage.market_data import MarketData
-from patron_arby.exchange.binance.api import BinanceApi
+from patron_arby.db.keys_provider import KeysProvider
+from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.exchange_event_listener import ExchangeEventListener
 from patron_arby.settings import BINANCE_WEB_SOCKET_URL
 
 log = logging.getLogger(__name__)
@@ -23,19 +25,22 @@ class BinanceDataListener:
 
     ws_manager: BinanceWebSocketApiManager = None
     channels = ["bookTicker"]
+    event_listeners: Set[ExchangeEventListener] = set()
 
-    def __init__(self, market_data: MarketData, binance_api: BinanceApi = BinanceApi()) -> None:
+    # Todo Replace MarketData with Bus
+    def __init__(self, market_data: MarketData, keys_provider: KeysProvider, markets: Set[str]) -> None:
         super().__init__()
         self.market_data = market_data
-        self.binance_api = binance_api
+        self.keys_provider = keys_provider
+        self.markets = markets
 
     def run(self):
         self.ws_manager = BinanceWebSocketApiManager(exchange=BINANCE_WEB_SOCKET_URL)
 
-        markets = self.binance_api.get_all_markets()
-        log.info(f"Totally markets: {len(markets)}")
+        log.info(f"Totally markets: {len(self.markets)}")
 
-        self._create_streams(markets)
+        self._create_streams(list(self.markets))
+        self._create_account_stream()
 
         while True:
             oldest_stream_data_from_stream_buffer = (
@@ -44,11 +49,17 @@ class BinanceDataListener:
             if not oldest_stream_data_from_stream_buffer:
                 continue
 
-            ticker_event = self._filter_events(oldest_stream_data_from_stream_buffer)
+            ticker_event = self._to_dict(oldest_stream_data_from_stream_buffer)
             if not ticker_event:
                 continue
 
+            for el in self.event_listeners:
+                el.on_exchange_event(ticker_event)
+
             self.market_data.put(ticker_event)
+
+    def add_event_listener(self, el: ExchangeEventListener):
+        self.event_listeners.add(el)
 
     def _create_streams(self, markets: List):
         divisor = math.ceil(len(markets) / self.ws_manager.get_limit_of_subscriptions_per_stream())
@@ -71,8 +82,18 @@ class BinanceDataListener:
                     loops += 1
                 i += 1
 
+    def _create_account_stream(self):
+        binance_api_key, binance_api_secret = self.keys_provider.get_exchange_api_keys(Binance.NAME)
+        self.ws_manager.create_stream(
+            ["!userData"],
+            ["arr"],  # Means "single stream for all"
+            api_key=binance_api_key,
+            api_secret=binance_api_secret,
+            stream_label="user_data"
+        )
+
     @staticmethod
-    def _filter_events(stream_event) -> Union[Dict, None]:
+    def _to_dict(stream_event) -> Union[Dict, None]:
         try:
             event = json.loads(stream_event)
             return event
