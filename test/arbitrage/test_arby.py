@@ -21,7 +21,7 @@ class TestArby(TestCase):
         }
         arby = PetroniusArbiter(MarketData(dict()), {}, 0)
         # 2. Act
-        step = arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
+        step = arby._create_chain_step(bidask, "BTC")
         print(f"I can buy {step.volume} BTC for USDT at the price {step.price}")
         print(f"This is equivalent to BUY {bidask.get('BestAskQuantity')} BTC at the price {bidask.get('BestAsk')} "
               f"for 1 BTC")
@@ -41,7 +41,7 @@ class TestArby(TestCase):
         }
         arby = PetroniusArbiter(MarketData(dict()), {}, 0)
         # 2. Act
-        step = arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        step = arby._create_chain_step(bidask, "USDT")
         log.debug(f"I can buy {step.volume} USDT for BTC at the price {step.price}")
         log.debug(f"This is equivalent to SELL {bidask.get('BestBidQuantity')} BTC at the price {bidask.get('BestBid')} "
               f"for 1 BTC")
@@ -62,8 +62,8 @@ class TestArby(TestCase):
         arby = PetroniusArbiter(MarketData(dict()), {})
 
         # 2. Act
-        step_btc = arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
-        step_usdt = arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        step_btc = arby._create_chain_step(bidask, "BTC")
+        step_usdt = arby._create_chain_step(bidask, "USDT")
 
         # 3. Assert
         btc_amount_after_buy_sell = (btc_amount / step_usdt.price) / step_btc.price
@@ -82,8 +82,8 @@ class TestArby(TestCase):
         arby = PetroniusArbiter(MarketData(dict()), {bidask.get("Market").replace("/", ""): 0.1})
 
         # 2. Act
-        step_btc = arby._get_coin_price_and_quantity_in_another_coin(bidask, "BTC")
-        step_usdt = arby._get_coin_price_and_quantity_in_another_coin(bidask, "USDT")
+        step_btc = arby._create_chain_step(bidask, "BTC")
+        step_usdt = arby._create_chain_step(bidask, "USDT")
 
         # 3. Assert
         self.assertEqual(bidask.get("BestAsk") * 1.1, step_btc.price)

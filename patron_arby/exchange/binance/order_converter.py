@@ -12,7 +12,8 @@ class BinanceOrderConverter(ExchangeOrderConverter):
             symbol=order_event.get(Binance.EVENT_KEY_SYMBOL),
             price=order_event.get(Binance.EVENT_KEY_PRICE),
             quantity=order_event.get(Binance.EVENT_KEY_QUANTITY),
-            status=order_event.get(Binance.EVENT_KEY_ORDER_STATUS))
+            status=order_event.get(Binance.EVENT_KEY_ORDER_STATUS),
+            order_id=order_event.get(Binance.EVENT_KEY_ORDER_ID))
 
         order.original_order = order_event
 

@@ -41,7 +41,7 @@ class PetroniusArbiter:
                 if not bidask_dict:  # or bidask_dict.get("LastUpdateTimeMs") < self.previous_run_time:
                     valid_3_chain = False
                     break
-                step = self._get_coin_price_and_quantity_in_another_coin(bidask_dict, coins[i + 1])
+                step = self._create_chain_step(bidask_dict, coins[i + 1])
                 steps.append(step)
 
             if not valid_3_chain:
@@ -90,7 +90,7 @@ class PetroniusArbiter:
             factor = factor * (step.price if step.is_buy() else 1 / step.price)
         return 1 - factor
 
-    def _get_coin_price_and_quantity_in_another_coin(self, bidask_dict: Dict, coin: str) -> AChainStep:
+    def _create_chain_step(self, bidask_dict: Dict, coin: str) -> AChainStep:
         """
         :param bidask_dict: Ticker
         :param coin:
@@ -116,9 +116,7 @@ class PetroniusArbiter:
         bid = bidask_dict.get("BestBid")
         bid_quantity = bidask_dict.get("BestBidQuantity")
         price = bid * (1 - trade_fee)
-        # todo Fix for SELL
         quantity = bid_quantity * price
-        # quantity = bid_quantity / price
 
         return AChainStep(market, OrderSide.SELL, price=price, volume=quantity)
 
@@ -130,23 +128,3 @@ class PetroniusArbiter:
             log.fine(f"USD price for coin '{coin}' not found")
             return -1
         return volume * coin_price_in_usd
-
-    def _print_buy_info(self, coin_1: str, coin_2: str, coin_21_price: float, coin_21_quantity: float):
-        if log.isEnabledFor(logging.FINE):
-            log.fine(f"We can buy {coin_21_quantity} {coin_2}s for {coin_1} at the price {coin_21_price}")
-            log.fine(f"  That means, we are spending {coin_21_quantity*coin_21_price} {coin_1} for {coin_21_quantity}"
-                  f" {coin_2}s")
-
-    def _out_path(self, out_dict: Dict):
-        coin_b = out_dict.get("coin_b")
-        coin_c = out_dict.get("coin_c")
-        coin_a = out_dict.get("coin_a")
-
-        sentence = f"\t We {self._get_subsentence(coin_b, coin_a.get('Coin'))}.\n"
-        sentence += f"\t Then, we {self._get_subsentence(coin_c, coin_b.get('Coin'))}.\n"
-        sentence += f"\t Last, we {self._get_subsentence(coin_a, coin_c.get('Coin'))}.\n"
-        log.debug(sentence)
-
-    def _get_subsentence(self, coin_dict: Dict, next_coin: str) -> str:
-        return f"{coin_dict.get('Buy/Sell')} {coin_dict.get('Quantity')} {coin_dict.get('Coin')} for 1 {next_coin}" \
-               f" at the price {coin_dict.get('Price')} via {coin_dict.get('Market')}"

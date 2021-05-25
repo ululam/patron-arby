@@ -31,12 +31,13 @@ class Order:
     arbitrage_id: str = None
     exchange: str = Binance.NAME
     status: str = "NEW"
-
-    # def __str__(self) -> str:
-    #     return dict_from_obj(self).__str__()
+    order_id: str = None
 
     def is_buy(self) -> bool:
         return self.order_side == OrderSide.BUY
+
+    def is_our_order(self):
+        return "_order_" in self.client_order_id
 
     def to_dict(self):
         d = dict_from_obj(self)

@@ -115,8 +115,6 @@ class MarketData:
                         if coin_d == coin_a:
                             self.paths_3[f"{coin_a} -> {coin_b} -> {coin_c} -> {coin_a}"] = \
                                 f"{market_ba} -> {market_cb} -> {market_ac}"
-                            # self.paths_3[self._path(coin_a, coin_b, coin_c, coin_a)] = \
-                            #     self._path(markets_ba, market_cb, market_ac)
 
         log.info(f"Total 3-paths: {len(self.paths_3)}")
 
@@ -134,6 +132,7 @@ class MarketData:
         base_quote_pair = self.symbol_to_base_quote_coins.get(market)
         if not base_quote_pair:
             raise AttributeError(f"There's no mapping for symbol {market}")
+        # todo To constants
         return base_quote_pair, {
             "Market": base_quote_pair,
             "BestBid": float(data.get("b")),

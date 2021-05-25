@@ -11,8 +11,6 @@ log = logging.getLogger(__name__)
 
 SENTINEL_MESSAGE = "SHUTDOWN"
 
-LOCK = threading.Lock()
-
 
 # todo Refactor to async IO mode
 # todo That will require async binance REST API impl
@@ -27,16 +25,17 @@ class OrderExecutor(threading.Thread):
         self.exchange_api = exchange_api
         self.order_dao = order_dao
 
-    def _post_order(self, o: Order):
+    def _post_order(self, o: Order) -> Order:
         log.info(f"Placing order {o}")
         try:
-            result = self.exchange_api.put_order(o)
+            result_order = self.exchange_api.put_order(o)
         except Exception as ex:
             # Add log line to identify which order failed
             log.error(f"Error placing order {o}: {ex}")
             self._remove_order_from_running(o)
             raise ex
-        log.info(f"Got order result {result}")
+        log.info(f"Got order result {result_order}")
+        return result_order
 
     def run(self):
         log.debug("Starting")
@@ -58,18 +57,15 @@ class OrderExecutor(threading.Thread):
 
         order: Order = msg
         # Fire first
-        self._post_order(order)
+        result_order = self._post_order(order)
         # Then, save.
-        # todo Possible race condition (if we got a status update from exchange BEFORE or DURING next line
-        # invocation. Highly improbable, but still possible
-        with LOCK:
-            self.order_dao.put_order(order)
+        self.order_dao.put_order(result_order)
 
         return False
 
     def _remove_order_from_running(self, o: Order):
-        chain_hash0 = o.client_order_id.split("_")[0]
-        running_orders = self.bus.running_orders_storage[chain_hash0]
+        chain_hash8 = o.client_order_id.split("_")[0]
+        running_orders = self.bus.running_orders_storage.get(chain_hash8)
         if running_orders:
             running_orders.remove(o.client_order_id)
 
