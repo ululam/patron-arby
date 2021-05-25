@@ -17,7 +17,6 @@ from patron_arby.exchange.binance.api import BinanceApi
 from patron_arby.exchange.binance.constants import ARBY_RUN_PERIOD_MS, Binance
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
-from patron_arby.exchange.order_cancelator import OrderCancelator
 from patron_arby.exchange.registry import BalancesRegistry
 from patron_arby.order.executor import OrderExecutor
 from patron_arby.order.manager import OrderManager
@@ -128,7 +127,6 @@ class Main:
         arby_thread = threading.Thread(target=self.run_arbitrage)
         # data_writer_thread = threading.Thread(target=self.write_data)
         balance_updater = threading.Thread(target=self._update_balances)
-        order_cancelator = OrderCancelator(self.binance_api)
 
         balance_updater.start()
         listener_thread.start()
@@ -136,7 +134,8 @@ class Main:
         order_manager.start()
         for exec in order_executors:
             exec.start()
-        order_cancelator.start()
+
+        # order_cancelator.start()
         # data_writer_thread.start()
 
         listener_thread.join()

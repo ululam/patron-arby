@@ -35,7 +35,7 @@ class BinanceOrderListener(ExchangeEventListener):
 
     def on_order_executed(self, order: Order):
         # Not a super solution, but there's a strong hope we won't run into hundreds of running arbitrage chains
-        chain_hash0 = order.client_order_id.split("_")[0]
-        running_order_ids = self.bus.running_orders_storage[chain_hash0]
+        chain_hash8 = order.client_order_id.split("_")[0]
+        running_order_ids = self.bus.running_orders_storage.get(chain_hash8)
         if running_order_ids:
             running_order_ids.remove(order.client_order_id)

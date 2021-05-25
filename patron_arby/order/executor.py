@@ -34,7 +34,7 @@ class OrderExecutor(threading.Thread):
             log.error(f"Error placing order {o}: {ex}")
             self._remove_order_from_running(o)
             raise ex
-        log.info(f"Got order result {result_order}")
+        log.debug(f"Got order result {result_order}")
         return result_order
 
     def run(self):

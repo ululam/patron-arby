@@ -15,6 +15,7 @@ class OrderDao:
         # self.firehose = boto3.client("firehose")
 
     def get_order(self, client_order_id: str) -> Optional[Order]:
+        assert client_order_id is not None
         try:
             record = self.table.get_item(Key={"client_order_id": client_order_id})
             if not record.get("Item"):

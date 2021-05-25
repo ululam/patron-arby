@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL
+from binance.enums import SIDE_BUY, SIDE_SELL, TIME_IN_FORCE_IOC
 
 from patron_arby.common.order import Order
 from patron_arby.db.keys_provider import KeysProvider
@@ -57,20 +57,22 @@ class BinanceApi(ExchangeApi):
         account = self.client.get_account()
         return {bal["asset"]: float(bal["free"]) for bal in account.get("balances")}
 
-    def put_order(self, o: Order) -> Order:
+    # todo timeInForce = FOK
+    def put_order(self, o: Order, time_in_force=TIME_IN_FORCE_IOC) -> Order:
         """
         :param o:
+        :param time_in_force: Good until cancel, Immediate or cancel, Fill-or-Kill
+                https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#new-order--trade
         :return: Orders as responded from the exchange
         """
-        log.debug(f"Placing order with order client id = {o.client_order_id}")
         order = self.client.order_limit(
             side=SIDE_BUY if o.is_buy() else SIDE_SELL,
             symbol=o.symbol,
             quantity=self._norm(o.quantity),
             price=self._norm(o.price),
-            newClientOrderId=o.client_order_id
+            newClientOrderId=o.client_order_id,
+            timeInForce=time_in_force
         )
-        log.debug(f"Placed order: {order}")
 
         return self.order_convertor.convert(order)
 
