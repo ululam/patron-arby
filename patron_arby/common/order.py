@@ -19,7 +19,7 @@ class OrderSide(Enum):
 
 @dataclass(eq=True)
 class Order:
-    # Consists of _hash8(chain) + "_order_" + number of the order, e.g. "349dsafa_order_2"
+    # Consists of chain.hash8() + "_order_" + number of the order, e.g. "349dsafa_order_2"
     client_order_id: str
     order_side: OrderSide
     symbol: str
@@ -32,6 +32,7 @@ class Order:
     exchange: str = Binance.NAME
     status: str = "NEW"
     order_id: str = None
+    transaction_time: int = -1
 
     def is_buy(self) -> bool:
         return self.order_side == OrderSide.BUY

@@ -1,5 +1,4 @@
 from queue import Queue
-from typing import Dict, Set
 
 
 class Bus:
@@ -9,11 +8,7 @@ class Bus:
     """
     _arbitrage_findings_queue: Queue = Queue()
     _fire_orders_queue: Queue = Queue()
-    # Dict of [chain -> List of running orders.
-    # Is promised to be thread-safe (if GIL)
-    # https://docs.python.org/3/glossary.html#term-global-interpreter-lock
-    # todo If running in containers, think how to provide similar 1-ms-digit communication channel (Redis most probably)
-    _running_orders_storage: Dict[str, Set[str]] = dict()
+    _tickers_queue: Queue = Queue()
 
     @property
     def arbitrage_findings_queue(self):
@@ -24,5 +19,5 @@ class Bus:
         return self._fire_orders_queue
 
     @property
-    def running_orders_storage(self) -> Dict[str, Set[str]]:
-        return self._running_orders_storage
+    def tickers_queue(self):
+        return self._tickers_queue

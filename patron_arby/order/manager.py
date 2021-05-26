@@ -94,9 +94,6 @@ class OrderManager(threading.Thread):
 
         orders = self._create_orders(chain)
 
-        # First, register in running orders
-        self.bus.running_orders_storage[self._hash8(chain)] = set([o.client_order_id for o in orders])
-        # Then, fire!
         for o in orders:
             self.bus.fire_orders_queue.put(o)
 
@@ -106,12 +103,6 @@ class OrderManager(threading.Thread):
         # todo Calc risk/profit as threshold https://linear.app/good-it-works/issue/ACT-413
         if chain.profit_usd < ORDER_PROFIT_THRESHOLD_USD:
             log.info(f"Chain profit ${chain.profit_usd} is less than threshold ${ORDER_PROFIT_THRESHOLD_USD}, skipping")
-            return False
-
-        chain_running_order_ids = self.bus.running_orders_storage.get(self._hash8(chain))
-        if chain_running_order_ids and len(chain_running_order_ids) > 0:
-            log.warning(f"Chain {chain.to_chain()} {len(chain_running_order_ids)} orders are still in progress, "
-                        f"skipping")
             return False
 
         return True
@@ -147,7 +138,7 @@ class OrderManager(threading.Thread):
         order_list = list()
         for step in chain.steps:
             index += 1
-            client_order_id = f"{OrderManager._hash8(chain)}_order_{index}"
+            client_order_id = f"{chain.hash8()}_order_{index}"
             price = OrderManager._calc_break_even_price(step, chain)
             symbol = step.market.replace("/", "")
             order = Order(client_order_id=client_order_id, order_side=step.side, symbol=symbol,
@@ -159,10 +150,6 @@ class OrderManager(threading.Thread):
             order_list.append(order)
 
         return order_list
-
-    @staticmethod
-    def _hash8(chain: AChain):
-        return abs(hash(chain.to_chain())) % (10 ** 8)
 
     # todo https://linear.app/good-it-works/issue/ACT-417
     # todo Shouldn't API do that?

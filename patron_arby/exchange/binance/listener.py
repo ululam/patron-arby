@@ -10,6 +10,7 @@ from unicorn_binance_websocket_api.unicorn_binance_websocket_api_manager import 
 from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.binance.ticker_converter import BinanceTickerConverter
 from patron_arby.exchange.exchange_event_listener import ExchangeEventListener
 from patron_arby.settings import BINANCE_WEB_SOCKET_URL
 
@@ -33,6 +34,7 @@ class BinanceDataListener:
         self.market_data = market_data
         self.keys_provider = keys_provider
         self.markets = markets
+        self.ticker_converter = BinanceTickerConverter()
 
     def run(self):
         self.ws_manager = BinanceWebSocketApiManager(exchange=BINANCE_WEB_SOCKET_URL)
@@ -49,14 +51,18 @@ class BinanceDataListener:
             if not oldest_stream_data_from_stream_buffer:
                 continue
 
-            ticker_event = self._to_dict(oldest_stream_data_from_stream_buffer)
-            if not ticker_event:
+            exchange_event = self._to_dict(oldest_stream_data_from_stream_buffer)
+            if not exchange_event:
                 continue
 
-            for el in self.event_listeners:
-                el.on_exchange_event(ticker_event)
+            # Refresh data BEFORE notifying listeners
+            if "data" in exchange_event:
+                self.market_data.put(
+                    self.ticker_converter.from_ws_event(exchange_event)
+                )
 
-            self.market_data.put(ticker_event)
+            for el in self.event_listeners:
+                el.on_exchange_event(exchange_event)
 
     def add_event_listener(self, el: ExchangeEventListener):
         self.event_listeners.add(el)
