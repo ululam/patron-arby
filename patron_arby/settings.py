@@ -1,8 +1,6 @@
 import logging
 import sys
 
-import coloredlogs
-
 from .config.base import *
 # from .config.staging import *
 from .config.prod import *
