@@ -36,11 +36,28 @@ class ExchangeApi(ABC):
         pass
 
     @abc.abstractmethod
-    def put_order(self, o: Order) -> object:
+    def put_order(self, o: Order) -> Order:
         """
         Puts the given order to the market
         :param o:
-        :return: Order id.
+        :return: result order as replied from the exchange
                 todo ATM, its not clear how the response should look like in generic case, for all exchanges
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_open_orders(self) -> List[Order]:
+        """
+        :return: List of all open orders for the current account
+        """
+        pass
+
+    @abc.abstractmethod
+    def cancel_order(self, symbol: str, order_id: str) -> object:
+        """
+        Cancels the given order
+        :param symbol:
+        :param order_id:
+        :return: Exchange-specific response
         """
         pass

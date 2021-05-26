@@ -14,7 +14,7 @@ from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.binance.api import BinanceApi
-from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.binance.constants import ARBY_RUN_PERIOD_MS, Binance
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
 from patron_arby.exchange.registry import BalancesRegistry
@@ -34,7 +34,7 @@ class Main:
 
         exec_count = 0
         while True:
-            time.sleep(0.1)
+            time.sleep(ARBY_RUN_PERIOD_MS * 0.001)
             result = self.petronius_arbiter.find(self.on_positive_arbitrage_found_callback)
             exec_count += 1
             if exec_count % 100 == 0:
@@ -134,6 +134,8 @@ class Main:
         order_manager.start()
         for exec in order_executors:
             exec.start()
+
+        # order_cancelator.start()
         # data_writer_thread.start()
 
         listener_thread.join()
