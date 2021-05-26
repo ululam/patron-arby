@@ -24,10 +24,10 @@ class BinanceOrderConverter(ExchangeOrderConverter):
             client_order_id=api_order.get(Binance.REST_KEY_CLIENT_ORDER_ID),
             order_side=OrderSide[api_order.get(Binance.REST_KEY_SIDE)],
             symbol=api_order.get(Binance.REST_KEY_SYMBOL),
-            price=api_order.get(Binance.REST_KEY_CLIENT_ORDER_ID),
-            quantity=api_order.get(Binance.REST_KEY_CLIENT_ORDER_ID),
+            price=api_order.get(Binance.REST_KEY_PRICE),
+            quantity=api_order.get(Binance.REST_KEY_ORIG_QUANTITY),
             status=api_order.get(Binance.REST_KEY_STATUS),
-            order_id=api_order.get(Binance.REST_KEY_CLIENT_ORDER_ID),
+            order_id=api_order.get(Binance.REST_KEY_ORDER_ID),
             transaction_time=api_order.get(Binance.REST_KEY_TRANSACT_TIME)
         )
         order.original_order = api_order

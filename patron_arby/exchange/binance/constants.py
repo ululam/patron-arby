@@ -18,7 +18,7 @@ class Binance:
     REST_KEY_ORDER_ID = "orderId"
     REST_KEY_SYMBOL = "symbol"
     REST_KEY_CLIENT_ORDER_ID = "clientOrderId"
-    REST_KEY_PRICE = "clientOrderId"
+    REST_KEY_PRICE = "price"
     REST_KEY_ORIG_QUANTITY = "origQty"
     REST_KEY_STATUS = "status"
     REST_KEY_SIDE = "side"
