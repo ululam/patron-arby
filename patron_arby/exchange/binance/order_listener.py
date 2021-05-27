@@ -24,7 +24,7 @@ class BinanceOrderListener(ExchangeEventListener):
 
         log.debug(f"Got order event {event}")
 
-        order = self.converter.convert(event)
+        order = self.converter.from_ws_event(event)
 
         log.info(f"Got notification that order {order.client_order_id} changed to status {order.status}")
 

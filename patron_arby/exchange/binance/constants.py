@@ -15,6 +15,19 @@ class Binance:
     ORDER_STATUS_FILLED = "FILLED"
     ORDER_STATUS_CANCELLED = "CANCELLED"
 
+    REST_KEY_ORDER_ID = "orderId"
+    REST_KEY_SYMBOL = "symbol"
+    REST_KEY_CLIENT_ORDER_ID = "clientOrderId"
+    REST_KEY_PRICE = "price"
+    REST_KEY_ORIG_QUANTITY = "origQty"
+    REST_KEY_STATUS = "status"
+    REST_KEY_SIDE = "side"
+    REST_KEY_TYPE = "type"
+    REST_KEY_FILLS = "fills"
+    REST_KEY_TRANSACT_TIME = "transactTime"
+
+    USD_COINS = {"BUSD", "USDT", "USDC"}
+
 
 ORDER_CANCELATOR_RUN_PERIOD_MS = 1_000
 ORDER_CANCELATOR_ORDER_TTL_MS = 5_000

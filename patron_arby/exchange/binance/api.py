@@ -65,7 +65,7 @@ class BinanceApi(ExchangeApi):
                 https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#new-order--trade
         :return: Orders as responded from the exchange
         """
-        order = self.client.order_limit(
+        result_order = self.client.order_limit(
             side=SIDE_BUY if o.is_buy() else SIDE_SELL,
             symbol=o.symbol,
             quantity=self._norm(o.quantity),
@@ -74,11 +74,11 @@ class BinanceApi(ExchangeApi):
             timeInForce=time_in_force
         )
 
-        return self.order_convertor.convert(order)
+        return self.order_convertor.from_rest_api_response(result_order)
 
     def get_open_orders(self) -> List[Order]:
         open_orders = self.client.get_open_orders()
-        return [self.order_convertor.convert(o) for o in open_orders]
+        return [self.order_convertor.from_rest_api_response(o) for o in open_orders]
 
     def cancel_order(self, symbol: str, order_id: str) -> object:
         return self.client.cancel_order(symbol=symbol, order_id=order_id)

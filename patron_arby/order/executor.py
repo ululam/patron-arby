@@ -32,9 +32,8 @@ class OrderExecutor(threading.Thread):
         except Exception as ex:
             # Add log line to identify which order failed
             log.error(f"Error placing order {o}: {ex}")
-            self._remove_order_from_running(o)
             raise ex
-        log.debug(f"Got order result {result_order}")
+        log.debug(f"Placed order: {result_order}")
         return result_order
 
     def run(self):
@@ -62,12 +61,6 @@ class OrderExecutor(threading.Thread):
         self.order_dao.put_order(result_order)
 
         return False
-
-    def _remove_order_from_running(self, o: Order):
-        chain_hash8 = o.client_order_id.split("_")[0]
-        running_orders = self.bus.running_orders_storage.get(chain_hash8)
-        if running_orders:
-            running_orders.remove(o.client_order_id)
 
     def _on_sentinel(self):
         log.debug(f"Got {SENTINEL_MESSAGE}, stopping")

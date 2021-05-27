@@ -1,9 +1,10 @@
 import logging
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Set, Tuple
 
 from patron_arby.arbitrage.arby_utils import ArbyUtils
 from patron_arby.arbitrage.market_data import COINS_PATH_SEPARATOR, MarketData
 from patron_arby.common.chain import AChain, AChainStep, OrderSide
+from patron_arby.common.ticker import Ticker
 from patron_arby.common.util import current_time_ms
 
 log = logging.getLogger(__name__)
@@ -14,15 +15,19 @@ class PetroniusArbiter:
     Responsible for find triangle arbitrage in market data
     """
 
-    def __init__(self, market_data: MarketData, trade_fees: Dict, default_trade_fee: float = 0.001) -> None:
+    def __init__(self, market_data: MarketData, trade_fees: Dict,
+                 on_positive_arbitrage_found_callback: Callable[[AChain], None] = None,
+                 default_trade_fee: float = 0.001) -> None:
         super().__init__()
         self.market_data = market_data
         self.previous_run_time = 0
         self.fees = trade_fees
         self.default_fee = default_trade_fee
+        self.on_positive_arbitrage_found_callback = on_positive_arbitrage_found_callback
 
     # @measure_execution_time
-    def find(self, on_positive_arbitrage_found_callback: Callable[[AChain], None] = None) -> List[AChain]:
+    def find(self, updated_markets: Set) -> List[AChain]:
+        # todo Lookup only chains coming via the given updated_markets
         log.fine(" =========== Starting find cycle")
         price_volume_data = self.market_data.get()
         if len(price_volume_data) == 0:
@@ -30,18 +35,20 @@ class PetroniusArbiter:
             return list()
 
         result = list()
-        for coins_path, markets_path in self.market_data.paths_3.items():
+
+        # for coins_path, markets_path in self.market_data.paths_3.items():
+        for coins_path, markets_path in self.market_data.filter_path3_by_markets(updated_markets):
             coins = coins_path.split(COINS_PATH_SEPARATOR)
             markets = markets_path.split(COINS_PATH_SEPARATOR)
 
             valid_3_chain = True
             steps: List[AChainStep] = list()
             for i in range(0, len(markets)):
-                bidask_dict = price_volume_data.get(markets[i])
-                if not bidask_dict:  # or bidask_dict.get("LastUpdateTimeMs") < self.previous_run_time:
+                ticker = price_volume_data.get(markets[i])
+                if not ticker:  # or bidask_dict.get("LastUpdateTimeMs") < self.previous_run_time:
                     valid_3_chain = False
                     break
-                step = self._create_chain_step(bidask_dict, coins[i + 1])
+                step = self._create_chain_step(ticker, coins[i + 1])
                 steps.append(step)
 
             if not valid_3_chain:
@@ -58,8 +65,8 @@ class PetroniusArbiter:
 
             if profit > 0:
                 log.debug(f"Found positive arbitrage chain: {chain}")
-                if on_positive_arbitrage_found_callback:
-                    on_positive_arbitrage_found_callback(chain)
+                if self.on_positive_arbitrage_found_callback:
+                    self.on_positive_arbitrage_found_callback(chain)
 
             result.append(chain)
 
@@ -90,35 +97,33 @@ class PetroniusArbiter:
             factor = factor * (step.price if step.is_buy() else 1 / step.price)
         return 1 - factor
 
-    def _create_chain_step(self, bidask_dict: Dict, coin: str) -> AChainStep:
+    def _create_chain_step(self, ticker: Ticker, coin: str) -> AChainStep:
         """
         :param bidask_dict: Ticker
         :param coin:
         :return: [price, volume, True if BUY, False if SELL]
         """
-        market = bidask_dict.get("Market")
-
-        base_quote = market.split("/")
+        base_quote = ticker.market.split("/")
         if coin == base_quote[0]:
             forward_buy = True      # We buy our coin using other coin as base
         elif coin == base_quote[1]:
             forward_buy = False     # Our coin is base, we are "selling"
         else:
-            raise AttributeError(f"Coin '{coin}' is not traded within market '{market}'")
+            raise AttributeError(f"Coin '{coin}' is not traded within market '{ticker.market}'")
 
-        trade_fee = self._get_trade_fee(market.replace("/", ""))
+        trade_fee = self._get_trade_fee(ticker.market.replace("/", ""))
 
         if forward_buy:
-            ask = bidask_dict.get("BestAsk")    # bid < ask
-            ask_quantity = bidask_dict.get("BestAskQuantity")
-            return AChainStep(market, OrderSide.BUY, price=ask * (1 + trade_fee), volume=ask_quantity)
+            ask = ticker.best_ask    # bid < ask
+            ask_quantity = ticker.best_ask_quantity
+            return AChainStep(ticker.market, OrderSide.BUY, price=ask * (1 + trade_fee), volume=ask_quantity)
 
-        bid = bidask_dict.get("BestBid")
-        bid_quantity = bidask_dict.get("BestBidQuantity")
+        bid = ticker.best_bid
+        bid_quantity = ticker.best_bid_quantity
         price = bid * (1 - trade_fee)
         quantity = bid_quantity * price
 
-        return AChainStep(market, OrderSide.SELL, price=price, volume=quantity)
+        return AChainStep(ticker.market, OrderSide.SELL, price=price, volume=quantity)
 
     def _get_profit_in_usd(self, coin: str, volume: float):
         if "USD" in coin:

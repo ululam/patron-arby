@@ -71,6 +71,9 @@ class AChain:
     def uid(self) -> str:
         return f"{'-'.join([s.market.replace('/', '') for s in self.steps])}_{self.timems}"
 
+    def hash8(self):
+        return abs(hash(self.to_chain())) % (10 ** 8)
+
     def is_for_same_chain(self, ac) -> bool:
         if not ac:
             return False
@@ -87,6 +90,7 @@ class AChain:
         d = dict_from_obj(self)
         d["steps"] = [s.to_dict() for s in self.steps]
         d["uid"] = self.uid()
+        d["hash8"] = self.hash8()
         return d
 
     def to_chain(self) -> str:
