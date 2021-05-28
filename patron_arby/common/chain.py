@@ -77,7 +77,11 @@ class AChain:
         return f"{'-'.join([s.market.replace('/', '') for s in self.steps])}_{self.timems}"
 
     def hash8(self):
-        return abs(hash(self.to_chain())) % (10 ** 8)
+        """
+        :return: 8-digits Hash of UID of this chain. There's no guarantee that there will be no collisions,
+                    yet the probability is pretty low.
+        """
+        return abs(hash(self.uid())) % (10 ** 8)
 
     def is_for_same_chain(self, ac) -> bool:
         if not ac:
@@ -96,6 +100,7 @@ class AChain:
         d["steps"] = [s.to_dict() for s in self.steps]
         d["uid"] = self.uid()
         d["hash8"] = self.hash8()
+        d["chain"] = self.to_chain()
         return d
 
     def to_chain(self) -> str:
