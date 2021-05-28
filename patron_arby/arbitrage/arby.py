@@ -25,8 +25,11 @@ class PetroniusArbiter:
         self.default_fee = default_trade_fee
         self.on_positive_arbitrage_found_callback = on_positive_arbitrage_found_callback
 
-    # @measure_execution_time
     def find(self, updated_markets: Set) -> List[AChain]:
+        """
+        :param updated_markets:
+        :return: List of all arbitrage chain verified, both profitable and non-profitable
+        """
         # todo Lookup only chains coming via the given updated_markets
         log.fine(" =========== Starting find cycle")
         price_volume_data = self.market_data.get()

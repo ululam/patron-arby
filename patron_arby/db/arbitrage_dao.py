@@ -5,7 +5,7 @@ from typing import Dict, List
 import boto3
 
 from patron_arby.common.chain import AChain
-from patron_arby.common.decorators import measure_execution_time, safely
+from patron_arby.common.decorators import safely
 
 
 class ArbitrageDao:
@@ -20,11 +20,12 @@ class ArbitrageDao:
         )
 
     @safely
-    @measure_execution_time
-    def put_arbitrage_records(self, arbitrages_list: List[Dict]):
-        records = [{"Data": json.dumps(r)} for r in arbitrages_list]
+    def put_arbitrage_records(self, chains: List[AChain]):
+        if len(chains) == 0:
+            return
+        records = [{"Data": json.dumps(c.to_dict())} for c in chains]
         self.firehose.put_record_batch(
-            DeliveryStreamName='arbitrage_top',
+            DeliveryStreamName='arbitrage',
             Records=records
         )
 

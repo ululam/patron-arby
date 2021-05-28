@@ -1,3 +1,4 @@
+import time
 from unittest import TestCase
 
 from patron_arby.common.order import Order, OrderSide
@@ -17,3 +18,10 @@ class TestOrder(TestCase):
         # 3. Assert
         self.assertEqual(o, o2)
         self.assertEqual(o.arbitrage_id, o2.arbitrage_id)
+
+    def test__two_orders_have_different_createdat(self):
+        # 1. Arrange
+        o1 = Order("asd", OrderSide.SELL, "BTCETH", price=0.01, quantity=0.2)
+        time.sleep(0.01)
+        o2 = Order("asd", OrderSide.SELL, "BTCETH", price=0.01, quantity=0.2)
+        self.assertNotEqual(o1.created_at, o2.created_at)

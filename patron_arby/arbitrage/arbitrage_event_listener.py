@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 class ArbitrageEventListener(ExchangeEventListener):
     start_time = 0
     counter = 0
+    total_counter = 0
 
     def __init__(self, bus: Bus) -> None:
         super().__init__()
@@ -43,7 +44,9 @@ class ArbitrageEventListener(ExchangeEventListener):
 
         self.counter += 1
         time_passed = current_time_ms() - self.start_time
-        if time_passed > 1_000:
+        if time_passed > 10_000:
             events_per_second = 1_000 * self.counter / time_passed
+            self.total_counter += self.counter
             log.debug(f"Ticker updates for our coins, per second: {int(events_per_second)}")
+            log.debug(f"Total ticker updates for our coins, since start: {self.total_counter}")
             self.counter = 0

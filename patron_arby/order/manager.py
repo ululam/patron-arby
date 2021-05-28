@@ -1,19 +1,18 @@
 import logging
 import threading
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain, AChainStep
 from patron_arby.common.decorators import safely
 from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.common.order import Order
-from patron_arby.common.util import current_time_ms, to_decimal
+from patron_arby.common.util import to_decimal
 from patron_arby.config.base import (
     MAX_BALANCE_RATIO_PER_SINGLE_ORDER,
     ORDER_PROFIT_THRESHOLD_USD,
 )
-from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.registry import BalancesRegistry
 
@@ -23,18 +22,13 @@ log = logging.getLogger(__name__)
 SENTINEL_MESSAGE = "SHUTDOWN"
 
 
-def log_execution_time(args):
-    pass
-
-
 class OrderManager(threading.Thread):
     # todo Set on creation
     exchange_name = Binance.NAME
 
     def __init__(self,
                  bus: Bus,
-                 exchange_limitations: Dict[str, Dict[ExchangeLimitation, object]],
-                 arbitrage_dao: ArbitrageDao,
+                 exchange_limitations: Dict[str, Dict[ExchangeLimitation, float]],
                  balances_registry: BalancesRegistry) -> None:
         """
         :param bus: Message bus
@@ -43,13 +37,12 @@ class OrderManager(threading.Thread):
         super().__init__()
         self.bus = bus
         self.exchange_limitations = exchange_limitations
-        self.arbitrage_dao = arbitrage_dao
         self.balances_registry = balances_registry
 
     def run(self) -> None:
         log.debug("Starting")
         while True:
-            msg = self.bus.arbitrage_findings_queue.get(block=True)
+            msg = self.bus.positive_arbitrages_queue.get(block=True)
             if msg == SENTINEL_MESSAGE:
                 break
             self._process(msg)
@@ -62,44 +55,31 @@ class OrderManager(threading.Thread):
                       f"Got {msg}, skipping")
             return
 
-        return self._on_arbitrage_option_found(msg)
+        comment = self._on_arbitrage_option_found(msg)
+        # Here, we have chain with comment. Pass it downstream for saving
+        msg.comment = comment
+        self.bus.store_positive_arbitrages_queue.put(msg)
 
-    def _on_arbitrage_option_found(self, chain: AChain):
+    @safely
+    def _on_arbitrage_option_found(self, chain: AChain) -> str:
         log.debug(f"Processing {chain.to_user_readable()}")
 
-        start = current_time_ms()
-        orders = self._do_quick_part(chain)
-        if not orders:
-            # Should not process
-            return
-        log.debug(f"_do_quick_part() took {(current_time_ms() - start)} ms")
-
-        # Now, we can do some slow activities
-        for o in orders:
-            log.debug(f"Put order {o}")
-
-        # Save arbitrage
-        # todo Move to a dedicated listener & pub/sub
-        return self.arbitrage_dao.put_profitable_arbitrage(chain)
-
-    def _do_quick_part(self, chain: AChain) -> Optional[List[Order]]:
-        """
-        Rather artificial than logical split: this method contain logic that should be done as quick as possible
-        """
-        if not self._should_process(chain):
-            return None
+        if not self._check_profit_is_large_enough(chain):
+            return "Arbitrage profit is too low"
 
         balances = self.balances_registry.get_balances(self.exchange_name)
         chain = self._shrink_volumes_according_to_balances(chain, balances)
 
-        orders = self._create_orders(chain)
+        orders, message = self._create_orders(chain)
+        if orders and len(orders) > 0:
+            for o in orders:
+                self.bus.fire_orders_queue.put(o)
+                log.debug(f"Put order {o}")
 
-        for o in orders:
-            self.bus.fire_orders_queue.put(o)
+        return message
 
-        return orders
-
-    def _should_process(self, chain: AChain):
+    @staticmethod
+    def _check_profit_is_large_enough(chain: AChain):
         # todo Calc risk/profit as threshold https://linear.app/good-it-works/issue/ACT-413
         if chain.profit_usd < ORDER_PROFIT_THRESHOLD_USD:
             log.info(f"Chain profit ${chain.profit_usd} is less than threshold ${ORDER_PROFIT_THRESHOLD_USD}, skipping")
@@ -133,7 +113,7 @@ class OrderManager(threading.Thread):
 
         return chain
 
-    def _create_orders(self, chain: AChain) -> List[Order]:
+    def _create_orders(self, chain: AChain) -> Tuple[List[Order], str]:
         index = 0
         order_list = list()
         for step in chain.steps:
@@ -147,9 +127,35 @@ class OrderManager(threading.Thread):
 
             order = self._round_price_and_volume_to_market_requirements(order)
 
+            meets_notional, msg = self._meets_min_notional(order)
+            if not meets_notional:
+                message = f"Order does not meet MIN_NOTIONAL filter ({msg}), skipping the whole chain: {order}"
+                log.warning(message)
+                # If min min_notional is not met, put no orders
+                return list(), f"Order does not meet MIN_NOTIONAL filter ({msg})"
+
             order_list.append(order)
 
-        return order_list
+        return order_list, "Orders created successfully"
+
+    def _meets_min_notional(self, order: Order) -> Tuple[bool, Optional[str]]:
+        """
+        :param order:
+        :return: True if order volume meets MIN_NOTIONAL exchange requirement, or if no MIN_NOTIONAL set.
+        If MIN_NOTIONAL set, and requirement is not met, returns False
+        """
+        limits = self.exchange_limitations.get(order.symbol)
+        if not limits:
+            log.fine(f"Limits for {order.symbol} not found")
+            return True, None
+        min_notional = limits.get(ExchangeLimitation.MIN_NOTIONAL)
+        if not min_notional:
+            return True, None
+
+        quantity_in_base_coin = order.quantity * order.price
+
+        return quantity_in_base_coin >= min_notional, f"{order.quantity} {order.symbol} ({quantity_in_base_coin} in " \
+                                                      f"base coin) < {min_notional}"
 
     # todo https://linear.app/good-it-works/issue/ACT-417
     # todo Shouldn't API do that?
@@ -158,10 +164,14 @@ class OrderManager(threading.Thread):
         if not limits:
             log.fine(f"Limits for {order.symbol} not found")
             return
+
         min_price_step = limits.get(ExchangeLimitation.MIN_PRICE_STEP)
-        order.price = to_decimal(order.price, Decimal(str(min_price_step)))
+        if min_price_step:
+            order.price = to_decimal(order.price, Decimal(str(min_price_step)))
+
         min_volume_step = limits.get(ExchangeLimitation.MIN_VOLUME_STEP)
-        order.quantity = to_decimal(order.quantity, Decimal(str(min_volume_step)))
+        if min_volume_step:
+            order.quantity = to_decimal(order.quantity, Decimal(str(min_volume_step)))
 
         return order
 

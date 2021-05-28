@@ -1,4 +1,5 @@
 import json
+import time
 from unittest import TestCase
 
 from patron_arby.common.chain import AChain, AChainStep, OrderSide
@@ -66,6 +67,12 @@ class TestArbitrageChain(TestCase):
         step = AChainStep("ETHBTC", OrderSide.SELL, 0.05, 40)
         we_get_volume = step.get_what_we_get_volume()
         eq(2, we_get_volume)         # We get 2 BTC
+
+    def test__two_chains_have_different_timems(self):
+        ac1 = AChain("BTC", [], 0.001, 0.3)
+        time.sleep(0.01)
+        ac2 = AChain("BTC", [], 0.001, 0.3)
+        self.assertNotEqual(ac1.timems, ac2.timems)
 
 
 def eq(f1: float, f2: float):

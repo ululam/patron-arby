@@ -1,21 +1,22 @@
 import logging
 import threading
 import time
-from typing import Dict, List, Union
+from typing import List
 
 from patron_arby.arbitrage.arbitrage_event_listener import ArbitrageEventListener
+from patron_arby.arbitrage.arbitrage_thread import ArbitrageThread
 from patron_arby.arbitrage.arby import PetroniusArbiter
 from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain
 from patron_arby.common.decorators import safely
-from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.config.base import ARBITRAGE_COINS
 from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.binance.api import BinanceApi
 from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
 from patron_arby.exchange.registry import BalancesRegistry
@@ -29,44 +30,34 @@ balances_registry = BalancesRegistry()
 
 
 class Main:
-    def _run_arbitrage(self):
-        # Wait some time for data to come
-        time.sleep(3)
-
-        exec_count = 0
-        while True:
-            ticker = bus.tickers_queue.get()
-            self.petronius_arbiter.find({ticker.market})
-            exec_count += 1
-            if exec_count % 100 == 0:
-                log.info(f"Ran arbitrage {exec_count} times")
-
     @staticmethod
     def _on_positive_arbitrage_found_callback(chain: AChain):
-        bus.arbitrage_findings_queue.put(chain)
-
-    def _build_exchange_limitations(self, binance_exchange_info: Dict) -> Dict:
-        limits = dict()
-        for s in binance_exchange_info.get('symbols'):
-            market = s.get("symbol")
-            limits[market] = dict()
-            filters = s.get("filters")
-            for f in filters:
-                if f.get("filterType") == "PRICE_FILTER":
-                    limits[market][ExchangeLimitation.MIN_PRICE_STEP] = self._remote_trailing_zeros(f.get("tickSize"))
-                elif f.get("filterType") == "LOT_SIZE":
-                    limits[market][ExchangeLimitation.MIN_VOLUME_STEP] = self._remote_trailing_zeros(f.get("stepSize"))
-
-        return limits
-
-    @staticmethod
-    def _remote_trailing_zeros(str_float: Union[str, float]) -> str:
-        return str(float(str_float))
+        bus.positive_arbitrages_queue.put(chain)
+        # Again fired in OrderManager, to have processing comment
+        # bus.store_positive_arbitrages_queue.put(chain)
 
     def _update_balances(self):
         while True:
             time.sleep(1)
             self._safe_update_balances()
+
+    def _run_store_arbitrages(self):
+        # Max size kinesis accepts is 500
+        CHAINS_BUFFER_SIZE = 500 >> 1
+        chains_buffer: List[AChain] = list()
+        while True:
+            # todo Queue is growing FASTER than we can process it, even with the buffer
+            chains = bus.all_arbitrages_queue.get()
+            chains_buffer += chains
+            if len(chains_buffer) >= CHAINS_BUFFER_SIZE:
+                self.arbitrage_dao.put_arbitrage_records(chains_buffer)
+                chains_buffer.clear()
+
+    def _run_store_positive_arbitrage(self):
+        while True:
+            time.sleep(0.1)
+            chain = bus.store_positive_arbitrages_queue.get()
+            self.arbitrage_dao.put_profitable_arbitrage(chain)
 
     @safely
     def _safe_update_balances(self):
@@ -75,12 +66,13 @@ class Main:
     def main(self, keys_provider: KeysProvider = KeysProvider()):
         # Create components
         self.binance_api = BinanceApi(keys_provider)
+        self.arbitrage_dao = ArbitrageDao()
 
         market_data = self._create_market_data()
 
-        self.petronius_arbiter = self._create_arby(market_data)
+        petronius_arbiter = self._create_arby(market_data)
 
-        order_manager = self._create_order_manager(bus, ArbitrageDao(), balances_registry)
+        order_manager = self._create_order_manager(bus, balances_registry)
 
         order_dao = OrderDao()
 
@@ -92,14 +84,18 @@ class Main:
         exchange_data_listener.add_event_listener(ArbitrageEventListener(bus))
 
         listener_thread = threading.Thread(target=exchange_data_listener.run)
-        arby_thread = threading.Thread(target=self._run_arbitrage)
+        arby_thread = ArbitrageThread(bus, petronius_arbiter)
         balance_updater = threading.Thread(target=self._update_balances)
+        arbitrages_store_thread = threading.Thread(target=self._run_store_arbitrages)
+        positive_arbitrages_store_thread = threading.Thread(target=self._run_store_positive_arbitrage)
 
         # Run everything
         balance_updater.start()
         listener_thread.start()
         arby_thread.start()
         order_manager.start()
+        arbitrages_store_thread.start()
+        positive_arbitrages_store_thread.start()
         for order_exec in order_executors:
             order_exec.start()
 
@@ -116,13 +112,9 @@ class Main:
             self.binance_api.get_default_trade_fee()
         )
 
-    def _create_order_manager(self, a_bus: Bus, arbitrage_dao: ArbitrageDao, registry: BalancesRegistry):
-        return OrderManager(
-            a_bus,
-            self._build_exchange_limitations(self.binance_api.get_exchange_info()),
-            arbitrage_dao,
-            registry
-        )
+    def _create_order_manager(self, a_bus: Bus, registry: BalancesRegistry):
+        limitations = BinanceExchangeLimitations(self.binance_api.get_exchange_info())
+        return OrderManager(a_bus, limitations.get_limitations(), registry)
 
     def _create_order_executors(self, order_dao: OrderDao) -> List[OrderExecutor]:
         order_executors: List[OrderExecutor] = list()

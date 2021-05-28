@@ -13,10 +13,10 @@ class TestOrderManager(TestCase):
     def test__round_price_and_volume_to_market_requirements(self):
         # 1. Arrange
         limits = {"BTCUSD": {
-            ExchangeLimitation.MIN_PRICE_STEP: "0.01",
-            ExchangeLimitation.MIN_VOLUME_STEP: "0.001"
+            ExchangeLimitation.MIN_PRICE_STEP: 0.01,
+            ExchangeLimitation.MIN_VOLUME_STEP: 0.001
         }}
-        om = OrderManager(Mock(), limits, Mock(), Mock())
+        om = OrderManager(Mock(), limits, Mock())
         order = Order("", OrderSide.SELL, "BTCUSD", price=12.34245435, quantity=44.345945345345)
         # 2. Act
         order = om._round_price_and_volume_to_market_requirements(order)
@@ -26,7 +26,7 @@ class TestOrderManager(TestCase):
 
     def test__shrink_volumes_according_to_balances__simple_case(self):
         # 1. Arrange
-        om = OrderManager(Mock(), {}, Mock(), Mock())
+        om = OrderManager(Mock(), {}, Mock())
         balances = {"BTC": 20, "USDT": 500, "ETH": 10}
         chain = AChain("BTC", [
             AChainStep("BTC/USDT", OrderSide.BUY, 30_000, 0.01),
@@ -42,7 +42,7 @@ class TestOrderManager(TestCase):
 
     def test__shrink_volumes_according_to_balances__no_shrink_required(self):
         # 1. Arrange
-        om = OrderManager(Mock(), {}, Mock(), Mock())
+        om = OrderManager(Mock(), {}, Mock())
         balances = {"BTC": 200, "USDT": 50000, "ETH": 10000}
         chain = AChain("BTC", [
             AChainStep("BTC/USDT", OrderSide.BUY, 30_000, 0.01),
@@ -58,7 +58,7 @@ class TestOrderManager(TestCase):
 
     def test__shrink_volumes_according_to_balances__all_balances_unsufficient(self):
         # 1. Arrange
-        om = OrderManager(Mock(), {}, Mock(), Mock())
+        om = OrderManager(Mock(), {}, Mock())
         balances = {"BTC": 0.1, "USDT": 300, "ETH": 1}
         chain = AChain("BTC", [
             AChainStep("BTC/USDT", OrderSide.BUY, 30_000, 0.01),
@@ -75,7 +75,7 @@ class TestOrderManager(TestCase):
     def test__process_happy_path(self):
         # 1. Arrange
         bus = Mock()
-        om = OrderManager(bus, {}, Mock(), Mock())
+        om = OrderManager(bus, {}, Mock())
         steps = [
             AChainStep("BTCUSDT", OrderSide.SELL, 0.01, 0.1),
             AChainStep("USDTETH", OrderSide.SELL, 0.01, 0.1),
