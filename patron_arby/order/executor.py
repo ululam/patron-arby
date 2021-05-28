@@ -32,7 +32,9 @@ class OrderExecutor(threading.Thread):
         except Exception as ex:
             # Add log line to identify which order failed
             log.error(f"Error placing order {o}: {ex}")
-            raise ex
+            o.status = "ERROR"
+            o.comment = f"{ex}"
+            return o
         log.debug(f"Placed order: {result_order}")
         return result_order
 

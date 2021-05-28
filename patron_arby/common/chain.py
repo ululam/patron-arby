@@ -66,7 +66,12 @@ class AChain:
     roi: float = 0
     profit: float = 0
     profit_usd: float = -1
-    timems: int = current_time_ms()
+    timems: int = -1
+    comment: str = ""
+
+    def __post_init__(self):
+        if self.timems == -1:
+            self.timems = current_time_ms()
 
     def uid(self) -> str:
         return f"{'-'.join([s.market.replace('/', '') for s in self.steps])}_{self.timems}"

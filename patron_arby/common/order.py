@@ -25,7 +25,7 @@ class Order:
     symbol: str
     quantity: float
     price: float
-    created_at: int = current_time_ms()
+    created_at: int = -1
     updated_at: int = 0
     original_order: Dict = None
     arbitrage_id: str = None
@@ -33,6 +33,11 @@ class Order:
     status: str = "NEW"
     order_id: str = None
     transaction_time: int = -1
+    comment: str = ""
+
+    def __post_init__(self):
+        if self.created_at == -1:
+            self.created_at = current_time_ms()
 
     def is_buy(self) -> bool:
         return self.order_side == OrderSide.BUY

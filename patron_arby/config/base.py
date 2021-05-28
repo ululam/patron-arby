@@ -7,4 +7,4 @@ ARBITRAGE_COINS = {"USDT", "DOGE", "EUR", "BTC", "BUSD", "ETH", "BNB"}  # "TRY"
 ORDER_PROFIT_THRESHOLD_USD = 0.01
 
 # Maximum ratio (%) of balance that can participate in a single order
-MAX_BALANCE_RATIO_PER_SINGLE_ORDER = 0.6    # 60%
+MAX_BALANCE_RATIO_PER_SINGLE_ORDER = 1.0    # 100%
