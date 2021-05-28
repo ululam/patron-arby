@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from patron_arby.common.chain import AChain, AChainStep
 from patron_arby.common.order import OrderSide
-from patron_arby.order.recent_arbitragers_filter import RecentArbitragersFilter
+from patron_arby.trade.recent_arbitragers_filter import RecentArbitragersFilter
 
 
 class TestRecentArbitragersFilter(TestCase):

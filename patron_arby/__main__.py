@@ -10,7 +10,12 @@ from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain
 from patron_arby.common.decorators import safely
-from patron_arby.config.base import ARBITRAGE_COINS
+from patron_arby.config.base import (
+    ARBITRAGE_COINS,
+    BALANCE_CHECKER_PERIOD_SECONDS,
+    KINESIS_MAX_BATCH_SIZE,
+    POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS,
+)
 from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.db.order_dao import OrderDao
@@ -20,8 +25,8 @@ from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
 from patron_arby.exchange.registry import BalancesRegistry
-from patron_arby.order.executor import OrderExecutor
-from patron_arby.order.manager import OrderManager
+from patron_arby.trade.executor import OrderExecutor
+from patron_arby.trade.manager import TradeManager
 
 log = logging.getLogger("patron_arby.main")
 
@@ -38,30 +43,30 @@ class Main:
 
     def _update_balances(self):
         while True:
-            time.sleep(1)
+            time.sleep(BALANCE_CHECKER_PERIOD_SECONDS)
             self._safe_update_balances()
 
+    @safely
+    def _safe_update_balances(self):
+        balances_registry.set_balances(Binance.NAME, self.binance_api.get_balances())
+
     def _run_store_arbitrages(self):
-        # Max size kinesis accepts is 500
-        CHAINS_BUFFER_SIZE = 500 >> 1
+        # Max size kinesis accepts is 500. Make it twice lower to ensure no overfill happens
+        chain_buffer_size = KINESIS_MAX_BATCH_SIZE >> 1
         chains_buffer: List[AChain] = list()
         while True:
             # todo Queue is growing FASTER than we can process it, even with the buffer
             chains = bus.all_arbitrages_queue.get()
             chains_buffer += chains
-            if len(chains_buffer) >= CHAINS_BUFFER_SIZE:
+            if len(chains_buffer) >= chain_buffer_size:
                 self.arbitrage_dao.put_arbitrage_records(chains_buffer)
                 chains_buffer.clear()
 
     def _run_store_positive_arbitrage(self):
         while True:
-            time.sleep(0.1)
+            time.sleep(POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS)
             chain = bus.store_positive_arbitrages_queue.get()
             self.arbitrage_dao.put_profitable_arbitrage(chain)
-
-    @safely
-    def _safe_update_balances(self):
-        balances_registry.set_balances(Binance.NAME, self.binance_api.get_balances())
 
     def main(self, keys_provider: KeysProvider = KeysProvider()):
         # Create components
@@ -75,7 +80,6 @@ class Main:
         order_manager = self._create_order_manager(bus, balances_registry)
 
         order_dao = OrderDao()
-
         order_executors = self._create_order_executors(order_dao)
 
         exchange_data_listener = BinanceDataListener(market_data, keys_provider,
@@ -114,7 +118,7 @@ class Main:
 
     def _create_order_manager(self, a_bus: Bus, registry: BalancesRegistry):
         limitations = BinanceExchangeLimitations(self.binance_api.get_exchange_info())
-        return OrderManager(a_bus, limitations.get_limitations(), registry)
+        return TradeManager(a_bus, limitations.get_limitations(), registry)
 
     def _create_order_executors(self, order_dao: OrderDao) -> List[OrderExecutor]:
         order_executors: List[OrderExecutor] = list()

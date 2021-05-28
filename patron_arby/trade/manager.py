@@ -15,7 +15,7 @@ from patron_arby.config.base import (
 )
 from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.registry import BalancesRegistry
-from patron_arby.order.recent_arbitragers_filter import RecentArbitragersFilter
+from patron_arby.trade.recent_arbitragers_filter import RecentArbitragersFilter
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 SENTINEL_MESSAGE = "SHUTDOWN"
 
 
-class OrderManager(threading.Thread):
+class TradeManager(threading.Thread):
     # todo Set on creation
     exchange_name = Binance.NAME
 
@@ -124,7 +124,7 @@ class OrderManager(threading.Thread):
         for step in chain.steps:
             index += 1
             client_order_id = f"{chain.hash8()}_order_{index}"
-            price = OrderManager._calc_break_even_price(step, chain)
+            price = TradeManager._calc_break_even_price(step, chain)
             symbol = step.market.replace("/", "")
             order = Order(client_order_id=client_order_id, order_side=step.side, symbol=symbol,
                 quantity=step.volume, price=price, arbitrage_hash8=chain.hash8())
