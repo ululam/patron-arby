@@ -1,7 +1,8 @@
 from decimal import Decimal
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain, AChainStep
 from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.common.order import Order, OrderSide
@@ -87,3 +88,17 @@ class TestOrderManager(TestCase):
         # 3. Assert
         # todo Check how bus has been called
         # bus.assert_called()
+
+    def test__stop_trading(self):
+        # 1. Arrange
+        bus = Bus()
+        bus.set_stop_trading(True)
+        tm = TradeManager(bus, {}, Mock())
+        with patch.object(tm, "_on_arbitrage_option_found", wraps=tm._on_arbitrage_option_found) as _on_found_method:
+            chain = AChain("BTC", [], 0.01, 10, ORDER_PROFIT_THRESHOLD_USD + 1)
+            # 2. Act
+            tm._process(chain)
+            # 3. Assert
+            self.assertEqual("Stop trading flag is True, ignoring arbitrage chain", chain.comment)
+            _on_found_method.assert_not_called()
+            self.assertEqual(chain, bus.store_positive_arbitrages_queue.get())

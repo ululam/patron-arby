@@ -57,7 +57,11 @@ class TradeManager(threading.Thread):
                       f"Got {msg}, skipping")
             return
 
-        comment = self._on_arbitrage_option_found(msg)
+        if self.bus.is_stop_trading:
+            comment = "Stop trading flag is True, ignoring arbitrage chain"
+            log.debug(f"{comment}: {msg.uid()}")
+        else:
+            comment = self._on_arbitrage_option_found(msg)
         # Here, we have chain with comment. Pass it downstream for saving
         msg.comment = comment
         self.bus.store_positive_arbitrages_queue.put(msg)
