@@ -57,7 +57,11 @@ class TradeManager(threading.Thread):
                       f"Got {msg}, skipping")
             return
 
-        comment = self._on_arbitrage_option_found(msg)
+        if self.bus.is_stop_trading:
+            comment = "Stop trading flag is True, ignoring arbitrage chain"
+            log.debug(f"{comment}: {msg.uid()}")
+        else:
+            comment = self._on_arbitrage_option_found(msg)
         # Here, we have chain with comment. Pass it downstream for saving
         msg.comment = comment
         self.bus.store_positive_arbitrages_queue.put(msg)
@@ -72,8 +76,7 @@ class TradeManager(threading.Thread):
         if not self._check_profit_is_large_enough(chain):
             return "Arbitrage profit is too low"
 
-        balances = self.balances_registry.get_balances(self.exchange_name)
-        chain = self._shrink_volumes_according_to_balances(chain, balances)
+        chain = self._shrink_volumes_according_to_balances(chain)
 
         orders, message = self._create_orders(chain)
         if orders and len(orders) > 0:
@@ -92,14 +95,14 @@ class TradeManager(threading.Thread):
 
         return True
 
-    def _shrink_volumes_according_to_balances(self, chain: AChain, balances: Dict[str, float],
+    def _shrink_volumes_according_to_balances(self, chain: AChain,
             max_balance_ratio_per_order: float = MAX_BALANCE_RATIO_PER_SINGLE_ORDER) -> AChain:
-        if not balances or len(balances) == 0:
-            log.debug(f"Not balances found for {self.exchange_name}")
+        if self.balances_registry.is_empty():
+            log.debug("No balances set")
             return chain
         max_step_volume_to_balance_ratio = 0
         for step in chain.steps:
-            step_selling_coin_balance = balances.get(step.spending_coin())
+            step_selling_coin_balance = self.balances_registry.get_balance(step.spending_coin())
             if not step_selling_coin_balance:
                 # We have no information about that balance. Hope for the better.
                 continue

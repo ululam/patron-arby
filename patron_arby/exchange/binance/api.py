@@ -55,9 +55,12 @@ class BinanceApi(ExchangeApi):
 
     def get_balances(self) -> Dict[str, float]:
         account = self.client.get_account()
-        return {bal["asset"]: float(bal["free"]) for bal in account.get("balances")}
+        return {bal["asset"]: float(bal["free"]) + float(bal["locked"]) for bal in account.get("balances")}
 
-    # todo timeInForce = FOK
+    def get_latest_prices(self) -> Dict[str, float]:
+        tickers = self.client.get_all_tickers()
+        return {market_ticker.get("symbol"): float(market_ticker.get("price")) for market_ticker in tickers}
+
     def put_order(self, o: Order, time_in_force=TIME_IN_FORCE_IOC) -> Order:
         """
         :param o:

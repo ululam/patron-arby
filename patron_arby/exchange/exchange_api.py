@@ -35,6 +35,12 @@ class ExchangeApi(ABC):
         """
         pass
 
+    def get_latest_prices(self) -> Dict[str, float]:
+        """
+        :return: {market -> price}
+        """
+        pass
+
     @abc.abstractmethod
     def put_order(self, o: Order) -> Order:
         """
