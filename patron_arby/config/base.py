@@ -11,3 +11,9 @@ MAX_BALANCE_RATIO_PER_SINGLE_ORDER = 1.0    # 100%
 
 # If we see same arbitrage chain, with the same profit, coming within the given time frame, we throttle it
 ARBITRAGE_DUPLICATION_TIMEFRAME_MS = 1_000
+
+# Max records kinesis allowes to write in a batch
+KINESIS_MAX_BATCH_SIZE = 500
+
+BALANCE_CHECKER_PERIOD_SECONDS = 1
+POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS = 0.1
