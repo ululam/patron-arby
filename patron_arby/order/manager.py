@@ -15,6 +15,7 @@ from patron_arby.config.base import (
 )
 from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.registry import BalancesRegistry
+from patron_arby.order.recent_arbitragers_filter import RecentArbitragersFilter
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class OrderManager(threading.Thread):
         self.bus = bus
         self.exchange_limitations = exchange_limitations
         self.balances_registry = balances_registry
+        self.recent_arbitragers_filter = RecentArbitragersFilter()
 
     def run(self) -> None:
         log.debug("Starting")
@@ -63,6 +65,9 @@ class OrderManager(threading.Thread):
     @safely
     def _on_arbitrage_option_found(self, chain: AChain) -> str:
         log.debug(f"Processing {chain.to_user_readable()}")
+
+        if self.recent_arbitragers_filter.register_and_return_contained(chain):
+            return "Won't process as considering as duplication (then same arbitrage within a short time frame)"
 
         if not self._check_profit_is_large_enough(chain):
             return "Arbitrage profit is too low"
@@ -122,8 +127,7 @@ class OrderManager(threading.Thread):
             price = OrderManager._calc_break_even_price(step, chain)
             symbol = step.market.replace("/", "")
             order = Order(client_order_id=client_order_id, order_side=step.side, symbol=symbol,
-                quantity=step.volume, price=price)
-            order.arbitrage_id = chain.uid()
+                quantity=step.volume, price=price, arbitrage_hash8=chain.hash8())
 
             order = self._round_price_and_volume_to_market_requirements(order)
 

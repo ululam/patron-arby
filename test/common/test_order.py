@@ -7,9 +7,8 @@ from patron_arby.common.order import Order, OrderSide
 class TestOrder(TestCase):
     def test__to_from_dict(self):
         # 1. Arrange
-        o = Order("asd", OrderSide.SELL, "BTCETH", price=0.01, quantity=0.2)
+        o = Order("asd", OrderSide.SELL, "BTCETH", price=0.01, quantity=0.2, arbitrage_hash8=12345)
         o.original_order = {"original": {"a": 1}}
-        o.arbitrage_id = "Arb_id"
         # 2. Act
         order_dict = o.to_dict()
         print(order_dict)
@@ -17,7 +16,7 @@ class TestOrder(TestCase):
         print(o2)
         # 3. Assert
         self.assertEqual(o, o2)
-        self.assertEqual(o.arbitrage_id, o2.arbitrage_id)
+        self.assertEqual(o.arbitrage_hash8, o2.arbitrage_hash8)
 
     def test__two_orders_have_different_createdat(self):
         # 1. Arrange
