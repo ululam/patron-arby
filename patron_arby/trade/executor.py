@@ -4,6 +4,7 @@ import threading
 from patron_arby.common.bus import Bus
 from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
+from patron_arby.common.util import current_time_ms
 from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.exchange_api import ExchangeApi
 
@@ -35,6 +36,8 @@ class OrderExecutor(threading.Thread):
             o.status = "ERROR"
             o.comment = f"{ex}"
             return o
+        # Set fire time for statistics
+        result_order.fired_at = current_time_ms()
         log.debug(f"Placed order: {result_order}")
         return result_order
 

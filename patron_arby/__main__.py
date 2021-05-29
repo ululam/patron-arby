@@ -13,14 +13,17 @@ from patron_arby.common.decorators import safely
 from patron_arby.config.base import (
     ARBITRAGE_COINS,
     BALANCE_CHECKER_PERIOD_SECONDS,
+    BALANCE_UPDATER_PERIOD_SECONDS,
     KINESIS_MAX_BATCH_SIZE,
+    ORDER_EXECUTORS_NUMBER,
     POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS,
+    THRESHOLD_BALANCE_USD_TO_STOP_TRADING,
 )
 from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.binance.api import BinanceApi
-from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.binance.balance_checker import BalancesChecker
 from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
@@ -32,6 +35,7 @@ log = logging.getLogger("patron_arby.main")
 
 bus = Bus()
 balances_registry = BalancesRegistry()
+balances_checker = BalancesChecker(bus, balances_registry, ARBITRAGE_COINS, THRESHOLD_BALANCE_USD_TO_STOP_TRADING)
 
 
 class Main:
@@ -43,12 +47,22 @@ class Main:
 
     def _update_balances(self):
         while True:
-            time.sleep(BALANCE_CHECKER_PERIOD_SECONDS)
+            time.sleep(BALANCE_UPDATER_PERIOD_SECONDS)
             self._safe_update_balances()
+            self._safe_update_exchange_rates()
+
+    def _check_balances(self) -> None:
+        while True:
+            time.sleep(BALANCE_CHECKER_PERIOD_SECONDS)
+            balances_checker.check_balance()
 
     @safely
     def _safe_update_balances(self):
-        balances_registry.set_balances(Binance.NAME, self.binance_api.get_balances())
+        balances_registry.update_balances(self.binance_api.get_balances())
+
+    @safely
+    def _safe_update_exchange_rates(self):
+        balances_registry.update_exchange_rates(self.binance_api.get_latest_prices())
 
     def _run_store_arbitrages(self):
         # Max size kinesis accepts is 500. Make it twice lower to ensure no overfill happens
@@ -89,12 +103,14 @@ class Main:
 
         listener_thread = threading.Thread(target=exchange_data_listener.run)
         arby_thread = ArbitrageThread(bus, petronius_arbiter)
-        balance_updater = threading.Thread(target=self._update_balances)
+        balance_updater_thread = threading.Thread(target=self._update_balances)
+        balance_checker_thread = threading.Thread(target=self._check_balances)
         arbitrages_store_thread = threading.Thread(target=self._run_store_arbitrages)
         positive_arbitrages_store_thread = threading.Thread(target=self._run_store_positive_arbitrage)
 
         # Run everything
-        balance_updater.start()
+        balance_updater_thread.start()
+        balance_checker_thread.start()
         listener_thread.start()
         arby_thread.start()
         order_manager.start()
@@ -122,7 +138,7 @@ class Main:
 
     def _create_order_executors(self, order_dao: OrderDao) -> List[OrderExecutor]:
         order_executors: List[OrderExecutor] = list()
-        for i in range(0, 1):
+        for i in range(0, ORDER_EXECUTORS_NUMBER):
             order_executors.append(
                 OrderExecutor(bus, self.binance_api, order_dao))
         return order_executors
