@@ -8,7 +8,7 @@ class TestOrder(TestCase):
     def test__to_from_dict(self):
         # 1. Arrange
         o = Order("asd", OrderSide.SELL, "BTCETH", price=0.01, quantity=0.2, arbitrage_hash8=12345)
-        o.original_order = {"original": {"a": 1}}
+        o.rest_reply_raw_order = {"original": {"a": 1}}
         # 2. Act
         order_dict = o.to_dict()
         print(order_dict)

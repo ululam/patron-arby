@@ -29,7 +29,8 @@ class Order:
     updated_at: int = 0
     fired_at: int = 0
     arbitrage_hash8: int = None
-    original_order: Dict = None
+    rest_reply_raw_order: Dict = None
+    event_raw_order: Dict = None
     exchange: str = Binance.NAME
     status: str = "NEW"
     order_id: str = None

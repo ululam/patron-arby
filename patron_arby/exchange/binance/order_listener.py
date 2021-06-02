@@ -23,4 +23,5 @@ class BinanceOrderListener(ExchangeEventListener):
 
         log.debug(f"Got order event {event}")
         order = self.converter.from_ws_event(event)
+        order.event_raw_order = event
         self.order_dao.put_order(order)

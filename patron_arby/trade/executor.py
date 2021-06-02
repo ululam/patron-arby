@@ -63,6 +63,7 @@ class OrderExecutor(threading.Thread):
         # Fire first
         result_order = self._post_order(order)
         # Then, save.
+
         self.order_dao.put_order(result_order)
 
         return False
