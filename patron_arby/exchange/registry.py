@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Optional
+from decimal import Decimal
+from typing import Dict, Optional, Union
 
 from patron_arby.config.base import DEFAULT_USD_COIN
 
@@ -41,6 +42,22 @@ class BalancesRegistry:
 
     def update_balances(self, balances: Dict[str, float]):
         self.balances = balances
+
+    def reduce_balance(self, coin: str, volume: Union[float, Decimal]):
+        """
+        Substracts given volume from the given coin balance.
+        Its expected and by design that the next `update_balances` call will erase any reductions happenned
+        (https://linear.app/good-it-works/issue/ACT-440)
+        :param coin:
+        :param volume:
+        :return:
+        """
+        amount = self.balances.get(coin)
+        # Can potentially go below 0, but there's no harm in it. Yet issue a warning
+        new_amount = amount - float(volume)
+        if new_amount < 0:
+            log.warning(f"{coin} balance went below zero. Was {amount}, became {new_amount}")
+        self.balances[coin] = new_amount
 
     def update_exchange_rates(self, exchange_rates: Dict):
         self.exchange_rates = exchange_rates

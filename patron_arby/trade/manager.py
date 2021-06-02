@@ -84,6 +84,7 @@ class TradeManager(threading.Thread):
             log.debug(f"{comment}: {chain.uid()}")
         else:
             comment = self._on_arbitrage_option_found(chain)
+            log.debug(comment)
         # Here, we have chain with comment. Pass it downstream for saving
         chain.comment = comment
         return chain
@@ -93,20 +94,40 @@ class TradeManager(threading.Thread):
         log.debug(f"Processing {chain.to_user_readable()}")
 
         if self.recent_arbitragers_filter.register_and_return_contained(chain):
-            return "Won't process as considering as duplication (then same arbitrage within a short time frame)"
+            return "Won't process as considering as duplication (same arbitrage within a short time frame)"
 
         if not self._check_profit_is_large_enough(chain):
             return "Arbitrage profit is too low"
 
+        all_balances_above_zero, error = self._check_we_have_all_three_balances_above_zero(chain)
+        if not all_balances_above_zero:
+            return error
+
         chain = self._shrink_volumes_according_to_balances(chain)
 
-        orders, message = self._create_orders(chain)
-        if orders and len(orders) > 0:
-            for o in orders:
-                self.bus.fire_orders_queue.put(o)
-                log.debug(f"Put order {o}")
+        orders = self._create_orders(chain)
 
-        return message
+        orders = [self._round_price_and_volume_to_market_requirements(order) for order in orders]
+
+        meets_all_filters, error = self._check_meets_exchange_filters(orders)
+        if not meets_all_filters:
+            return error
+
+        self._put_orders_to_execution_queue(orders, chain)
+
+        return "Orders created successfully"
+
+    def _put_orders_to_execution_queue(self, orders: List[Order], chain: AChain):
+        for order, step in zip(orders, chain.steps):
+            # Put to the queue for order executors to pick up
+            self.bus.fire_orders_queue.put(order)
+            # Extract order volume from local cache to prevent setting next order(s) when balance is actually consumed
+            # by previous order(s) yet not really reflected in the balance itself (order(s) is in fly, waiting for fill,
+            # balance cache has not been refreshed yet)
+            # https://linear.app/good-it-works/issue/ACT-440/
+            # Here, its important to use orders volume (not chain), as orders volumes are subject of adjustment
+            self.balances_registry.reduce_balance(step.spending_coin(), order.get_what_we_propose_volume())
+            log.debug(f"Put order {order}")
 
     def _sort_chains_by_profitability(self, chains: Set[AChain]) -> List[AChain]:
         if self.sort_arbitrage_by_roi:
@@ -121,6 +142,13 @@ class TradeManager(threading.Thread):
             return False
 
         return True
+
+    def _check_we_have_all_three_balances_above_zero(self, chain: AChain) -> Tuple[bool, str]:
+        for step in chain.steps:
+            coin_balance = self.balances_registry.get_balance(step.spending_coin())
+            if coin_balance <= 0:
+                return False, f"{step.spending_coin()} balance is 0 or below: {coin_balance}"
+        return True, "All balances are fine"
 
     def _shrink_volumes_according_to_balances(self, chain: AChain,
             max_balance_ratio_per_order: float = MAX_BALANCE_RATIO_PER_SINGLE_ORDER) -> AChain:
@@ -148,7 +176,8 @@ class TradeManager(threading.Thread):
 
         return chain
 
-    def _create_orders(self, chain: AChain) -> Tuple[List[Order], str]:
+    @staticmethod
+    def _create_orders(chain: AChain) -> List[Order]:
         index = 0
         order_list = list()
         for step in chain.steps:
@@ -159,18 +188,19 @@ class TradeManager(threading.Thread):
             order = Order(client_order_id=client_order_id, order_side=step.side, symbol=symbol,
                 quantity=step.volume, price=price, arbitrage_hash8=chain.hash8())
 
-            order = self._round_price_and_volume_to_market_requirements(order)
-
-            meets_notional, msg = self._meets_min_notional(order)
-            if not meets_notional:
-                message = f"Order does not meet MIN_NOTIONAL filter ({msg}), skipping the whole chain: {order}"
-                log.warning(message)
-                # If min min_notional is not met, put no orders
-                return list(), f"Order does not meet MIN_NOTIONAL filter ({msg})"
-
             order_list.append(order)
 
-        return order_list, "Orders created successfully"
+        return order_list
+
+    def _check_meets_exchange_filters(self, orders: List[Order]) -> Tuple[bool, str]:
+        for order in orders:
+            meets_notional, msg = self._meets_min_notional(order)
+            if not meets_notional:
+                # If min min_notional is not met, put no orders
+                message = f"Order does not meet MIN_NOTIONAL filter ({msg})"
+                log.warning(message + f", skipping the whole chain: {order}")
+                return False, message
+        return True, "Orders meet all filters"
 
     def _meets_min_notional(self, order: Order) -> Tuple[bool, Optional[str]]:
         """

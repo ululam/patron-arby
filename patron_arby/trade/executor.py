@@ -27,7 +27,7 @@ class OrderExecutor(threading.Thread):
         self.order_dao = order_dao
 
     def _post_order(self, o: Order) -> Order:
-        log.info(f"Placing order {o}")
+        log.info(f"Placing order {o.client_order_id}")
         try:
             result_order = self.exchange_api.put_order(o)
         except Exception as ex:
