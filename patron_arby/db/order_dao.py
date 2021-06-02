@@ -39,7 +39,6 @@ class OrderDao:
                 Item=self._convert_floats_to_decimals(prev_order_dict)
             )
 
-        order.created_at = current_time_ms()
         return self.table.put_item(
             Item=self._convert_floats_to_decimals(order.to_dict())
         )

@@ -21,7 +21,7 @@ class RecentArbitragersFilter:
 
     def register_and_return_contained(self, chain: AChain):
         """
-        Registers the given chain in local cache (refreshed last_seen_time if there is a duplication)
+        Registers the given chain in local cache, if there was no duplication found. Otherwise, just returns True
         :param chain:
         :return: False if there was no duplicated chain, True if the given chain is a duplication of a registered one.
         """
@@ -30,9 +30,12 @@ class RecentArbitragersFilter:
         key = self._to_key(chain)
         last_seen_time = self.recent_chains.pop(key, 0)
         now = current_time_ms()
-        self.recent_chains[key] = now
+        contains_duplication = now - last_seen_time < self.arbitrage_duplication_ttl
+        if contains_duplication:
+            return True
 
-        return now - last_seen_time < self.arbitrage_duplication_ttl
+        self.recent_chains[key] = now
+        return False
 
     def _to_key(self, chain: AChain):
         return f"{chain.to_chain()}_roi_{chain.roi}"

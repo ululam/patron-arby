@@ -53,18 +53,22 @@ class BalancesChecker:
                          f" ${self.stop_trading_balance_threshold_usd}. Trading is stopped")
             self.bus.set_stop_trading(True)
 
-        self._out_balances(balances)
+        self.log_balances()
 
         return total_balance_usd
 
-    def _out_balances(self, balances: Dict[str, Balance]):
+    def balances_report(self) -> str:
+        balances = self.get_balances()
         output = "\n=== Current balances: === \n"
         for coin in sorted(self.coins_of_interest):
             bal = balances.get(coin)
             output += SPACE.join([coin, self._dec(bal.value), self._dec(bal.value_usd), "\n"])
         total_balance_usd = sum([b.value_usd for b in balances.values()])
         output += f"=== Total: ${self._dec(total_balance_usd)} BUSD === "
-        log.info(output)
+        return output
+
+    def log_balances(self):
+        log.info(self.balances_report())
 
     @staticmethod
     def _dec(v) -> str:

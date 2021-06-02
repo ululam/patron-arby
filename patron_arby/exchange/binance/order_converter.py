@@ -20,7 +20,7 @@ class BinanceOrderConverter(ExchangeOrderConverter):
             order_id=order_event.get(Binance.EVENT_KEY_ORDER_ID)
         )
         order.arbitrage_hash8 = self.get_arbitrage_hash8_from_client_order_id(order.client_order_id)
-        order.rest_reply_raw_order = order_event
+        order.event_raw_order = order_event
         return order
 
     def from_rest_api_response(self, api_order: Dict) -> Order:
