@@ -1,6 +1,6 @@
 from decimal import Decimal
 from unittest import TestCase
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain, AChainStep
@@ -117,3 +117,27 @@ class TestTradeManager(TestCase):
             # 3. Assert
             _on_found_method.assert_called_with(chain)
             self.assertEqual(chain, bus.store_positive_arbitrages_queue.get())
+
+    def test__put_orders_to_execution_queue_reduces_balances(self):
+        # 1. Arrange
+        balances_registry = Mock()
+        balances_registry.reduce_balance = Mock()
+        tm = TradeManager(Mock(), {}, balances_registry)
+        orders = [
+            Order("12345678_order_1", OrderSide.SELL, "BTCUSDT", Decimal(2), price=35_000),  # check that Decimal works
+            Order("12345678_order_2", OrderSide.SELL, "USDTBUSD", 70_000, price=1),
+            Order("12345678_order_3", OrderSide.BUY, "BTCBUSD", 2, price=34_000)
+        ]
+        step1 = Mock()
+        step1.spending_coin.return_value = "BTC"
+        step2 = Mock()
+        step2.spending_coin.return_value = "USDT"
+        step3 = Mock()
+        step3.spending_coin.return_value = "BUSD"
+        steps = [step1, step2, step3]
+        chain = AChain("BTC", steps)
+        # 2. Act
+        tm._put_orders_to_execution_queue(orders, chain)
+        # 3. Assert
+        self.assertEqual([call("BTC", 2), call("USDT", 70_000), call("BUSD", 68_000)],
+            balances_registry.reduce_balance.mock_calls)
