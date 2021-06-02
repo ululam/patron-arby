@@ -6,6 +6,7 @@ from patron_arby.arbitrage.market_data import COINS_PATH_SEPARATOR, MarketData
 from patron_arby.common.chain import AChain, AChainStep, OrderSide
 from patron_arby.common.ticker import Ticker
 from patron_arby.common.util import current_time_ms
+from patron_arby.config.base import ARBITRAGE_FIRE_CHAIN_ASAP
 
 log = logging.getLogger(__name__)
 
@@ -16,12 +17,14 @@ class PetroniusArbiter:
     """
 
     def __init__(self, market_data: MarketData, trade_fees: Dict,
-                 on_positive_arbitrage_found_callback: Callable[[AChain], None] = None,
+                 on_positive_arbitrage_found_callback: Callable[[Set[AChain]], None],
+                 fire_chains_asap: bool = ARBITRAGE_FIRE_CHAIN_ASAP,
                  default_trade_fee: float = 0.001) -> None:
         super().__init__()
         self.market_data = market_data
         self.previous_run_time = 0
         self.fees = trade_fees
+        self.fire_chains_asap = fire_chains_asap
         self.default_fee = default_trade_fee
         self.on_positive_arbitrage_found_callback = on_positive_arbitrage_found_callback
 
@@ -38,6 +41,7 @@ class PetroniusArbiter:
             return list()
 
         result = list()
+        profitable_chains = set()
 
         # for coins_path, markets_path in self.market_data.paths_3.items():
         for coins_path, markets_path in self.market_data.filter_path3_by_markets(updated_markets):
@@ -67,14 +71,19 @@ class PetroniusArbiter:
                 profit_usd=profit_usd)
 
             if profit > 0:
-                log.debug(f"Found positive arbitrage chain: {chain}")
-                if self.on_positive_arbitrage_found_callback:
-                    self.on_positive_arbitrage_found_callback(chain)
+                profitable_chains.add(chain)
+                if self.fire_chains_asap:
+                    log.debug(f"Found positive arbitrage chain, firing ASAP: {chain}")
+                    self.on_positive_arbitrage_found_callback({chain})
 
             result.append(chain)
 
         self.previous_run_time = current_time_ms()
         log.fine(" =========== End find cycle")
+
+        if len(profitable_chains) > 0 and not self.fire_chains_asap:
+            log.debug(f"Found positive {len(profitable_chains)} arbitrage chains, firing all together")
+            self.on_positive_arbitrage_found_callback(profitable_chains)
 
         return result
 

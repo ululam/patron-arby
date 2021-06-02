@@ -58,3 +58,9 @@ class Order:
         o = obj_from_dict(order_dict, Order(None, None, "", price=0, quantity=0))
         o.order_side = OrderSide[o.order_side] if o.order_side else None
         return o
+
+    def get_what_we_propose_volume(self) -> float:
+        """
+        :return: Volume of the coin which we actually spend in this step
+        """
+        return self.quantity * self.price if self.is_buy() else self.quantity
