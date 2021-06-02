@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from typing import List
+from typing import List, Set
 
 from patron_arby.arbitrage.arbitrage_event_listener import ArbitrageEventListener
 from patron_arby.arbitrage.arbitrage_thread import ArbitrageThread
@@ -12,6 +12,7 @@ from patron_arby.common.chain import AChain
 from patron_arby.common.decorators import safely
 from patron_arby.config.base import (
     ARBITRAGE_COINS,
+    ARBITRAGE_FIRE_CHAIN_ASAP,
     BALANCE_CHECKER_PERIOD_SECONDS,
     BALANCE_UPDATER_PERIOD_SECONDS,
     KINESIS_MAX_BATCH_SIZE,
@@ -40,8 +41,8 @@ balances_checker = BalancesChecker(bus, balances_registry, ARBITRAGE_COINS, THRE
 
 class Main:
     @staticmethod
-    def _on_positive_arbitrage_found_callback(chain: AChain):
-        bus.positive_arbitrages_queue.put(chain)
+    def _on_positive_arbitrage_found_callback(chains: Set[AChain]):
+        bus.positive_arbitrages_queue.put(chains)
         # Again fired in OrderManager, to have processing comment
         # bus.store_positive_arbitrages_queue.put(chain)
 
@@ -129,6 +130,7 @@ class Main:
             market_data,
             self.binance_api.get_trade_fees(),
             self._on_positive_arbitrage_found_callback,
+            ARBITRAGE_FIRE_CHAIN_ASAP,
             self.binance_api.get_default_trade_fee()
         )
 

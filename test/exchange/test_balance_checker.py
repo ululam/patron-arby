@@ -18,7 +18,7 @@ class TestBalancesChecker(TestCase):
         # 2. Act
         balances_checker.check_balance()
         # 3. Assert
-        self.assertTrue(bus.is_stop_trading)
+        self.assertTrue(bus.is_stop_trading())
 
     def test__not_breaching_threshold_does_not_stop_trading(self):
         # 1. Arrange
@@ -32,4 +32,4 @@ class TestBalancesChecker(TestCase):
         # 2. Act
         balances_checker.check_balance()
         # 3. Assert
-        self.assertFalse(bus.is_stop_trading)
+        self.assertFalse(bus.is_stop_trading())

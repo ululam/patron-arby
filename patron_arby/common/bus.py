@@ -35,7 +35,6 @@ class Bus:
     def all_arbitrages_queue(self) -> Queue:
         return self._all_arbitrages_queue
 
-    @property
     def is_stop_trading(self) -> bool:
         return self._stop_trading
 
