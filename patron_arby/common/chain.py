@@ -58,6 +58,9 @@ class AChainStep:
     def __str__(self):
         return f"[{self.side} {self.volume} {self.market} @ {self.price}]"
 
+    def __repr__(self):
+        return self.__str__()
+
 
 @dataclass
 class AChain:
@@ -74,7 +77,8 @@ class AChain:
             self.timems = current_time_ms()
 
     def uid(self) -> str:
-        return f"{'-'.join([s.market.replace('/', '') for s in self.steps])}_{self.timems}"
+        markets = [s.market.replace('/', '') for s in self.steps] if self.steps else []
+        return f"{'-'.join(markets)}_{self.timems}"
 
     def hash8(self):
         """
@@ -115,3 +119,6 @@ class AChain:
         ac = obj_from_dict(d, AChain())
         ac.steps = [AChainStep.from_dict(step_d) for step_d in d["steps"]]
         return ac
+
+    def __hash__(self) -> int:
+        return self.uid().__hash__()

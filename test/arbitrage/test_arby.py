@@ -21,7 +21,7 @@ class TestArby(TestCase):
             best_ask_quantity=2.01
         )
 
-        arby = PetroniusArbiter(MarketData(dict()), {}, None, 0)
+        arby = PetroniusArbiter(MarketData(dict()), {}, None, True, 0)
         # 2. Act
         step = arby._create_chain_step(bidask, "BTC")
         print(f"I can buy {step.volume} BTC for USDT at the price {step.price}")
@@ -41,7 +41,7 @@ class TestArby(TestCase):
             best_ask_quantity=2.01
         )
 
-        arby = PetroniusArbiter(MarketData(dict()), {}, None, 0)
+        arby = PetroniusArbiter(MarketData(dict()), {}, None, True, 0)
         # 2. Act
         step = arby._create_chain_step(bidask, "USDT")
         log.debug(f"I can buy {step.volume} USDT for BTC at the price {step.price}")
@@ -61,7 +61,7 @@ class TestArby(TestCase):
         )
 
         btc_amount = 1
-        arby = PetroniusArbiter(MarketData(dict()), {})
+        arby = PetroniusArbiter(MarketData(dict()), {}, None)
 
         # 2. Act
         step_btc = arby._create_chain_step(bidask, "BTC")
@@ -81,7 +81,7 @@ class TestArby(TestCase):
             best_ask_quantity=2.01
         )
         btc_amount = 1
-        arby = PetroniusArbiter(MarketData(dict()), {bidask.market.replace("/", ""): 0.1})
+        arby = PetroniusArbiter(MarketData(dict()), {bidask.market.replace("/", ""): 0.1}, None)
 
         # 2. Act
         step_btc = arby._create_chain_step(bidask, "BTC")
@@ -94,7 +94,7 @@ class TestArby(TestCase):
     @skip
     def test__find_using_real_market_snapshot(self):
         # 1. Arrange
-        arby = PetroniusArbiter(self._load_market_data(), {})
+        arby = PetroniusArbiter(self._load_market_data(), {}, None)
 
         # 2. Act
         result = arby.find({})
