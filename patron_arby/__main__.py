@@ -27,6 +27,7 @@ from patron_arby.exchange.binance.api import BinanceApi
 from patron_arby.exchange.binance.balance_checker import BalancesChecker
 from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
+from patron_arby.exchange.binance.order_listener import BinanceOrderListener
 from patron_arby.exchange.registry import BalancesRegistry
 from patron_arby.trade.executor import OrderExecutor
 from patron_arby.trade.manager import TradeManager
@@ -100,7 +101,7 @@ class Main:
             set(self.binance_api.get_all_markets()))
         # https://linear.app/good-it-works/issue/ACT-442
 
-        # exchange_data_listener.add_event_listener(BinanceOrderListener(bus, order_dao))     # todo Via Bus?
+        exchange_data_listener.add_event_listener(BinanceOrderListener(bus, order_dao))     # todo Via Bus?
         exchange_data_listener.add_event_listener(ArbitrageEventListener(bus))
 
         listener_thread = threading.Thread(target=exchange_data_listener.run)

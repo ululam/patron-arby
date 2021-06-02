@@ -36,7 +36,7 @@ class BinanceOrderListener(ExchangeEventListener):
         if not existing_order:
             # https://linear.app/good-it-works/issue/ACT-446
             log.warning(f"Order does not exist for client_order_id {order.client_order_id}. Most probably we got the "
-                        f"event BEFORE we got REST API put_order response and wrote its result to he database. "
+                        f"event BEFORE we got REST API `put_order` response and wrote its result to he database. "
                         f"Ignoring event.")
             return False
 
