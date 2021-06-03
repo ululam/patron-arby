@@ -6,6 +6,7 @@ from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
 from patron_arby.common.util import current_time_ms
 from patron_arby.db.order_dao import OrderDao
+from patron_arby.exchange.binance.balance_checker import BalancesChecker
 from patron_arby.exchange.exchange_api import ExchangeApi
 
 log = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ SENTINEL_MESSAGE = "SHUTDOWN"
 # todo Refactor to async IO mode
 # todo That will require async binance REST API impl
 class OrderExecutor(threading.Thread):
-    def __init__(self, bus: Bus, exchange_api: ExchangeApi, order_dao: OrderDao) -> None:
+    def __init__(self, bus: Bus, exchange_api: ExchangeApi, order_dao: OrderDao,
+                 balances_checker: BalancesChecker = None) -> None:
         """
         :param bus: Message bus
         :param exchange_api:  ExchangeApi. Be careful, and create 1 API instance per thread if its not thread-safe
@@ -25,6 +27,7 @@ class OrderExecutor(threading.Thread):
         self.bus = bus
         self.exchange_api = exchange_api
         self.order_dao = order_dao
+        self.balances_checker = balances_checker
 
     def _post_order(self, o: Order) -> Order:
         log.info(f"Placing order {o.client_order_id}")
@@ -33,6 +36,7 @@ class OrderExecutor(threading.Thread):
         except Exception as ex:
             # Add log line to identify which order failed
             log.error(f"Error placing order {o}: {ex}")
+            self._print_extra_info_for_exception(ex)
             o.status = "ERROR"
             o.comment = f"{ex}"
             return o
@@ -63,9 +67,18 @@ class OrderExecutor(threading.Thread):
         # Fire first
         result_order = self._post_order(order)
         # Then, save.
+
         self.order_dao.put_order(result_order)
 
         return False
+
+    def _print_extra_info_for_exception(self, ex: Exception):
+        if hasattr(ex, "code"):
+            print(f"Has code: {ex.code}")
+            # APIError(code=-2010) Insufficient balance => print balances
+            if str(ex.code) == "-2010":
+                if self.balances_checker:
+                    self.balances_checker.log_balances()
 
     def _on_sentinel(self):
         log.debug(f"Got {SENTINEL_MESSAGE}, stopping")

@@ -99,6 +99,8 @@ class Main:
 
         exchange_data_listener = BinanceDataListener(market_data, keys_provider,
             set(self.binance_api.get_all_markets()))
+        # https://linear.app/good-it-works/issue/ACT-442
+
         exchange_data_listener.add_event_listener(BinanceOrderListener(bus, order_dao))     # todo Via Bus?
         exchange_data_listener.add_event_listener(ArbitrageEventListener(bus))
 

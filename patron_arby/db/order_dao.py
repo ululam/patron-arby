@@ -10,9 +10,8 @@ from patron_arby.common.util import current_time_ms
 
 
 class OrderDao:
-    def __init__(self) -> None:
-        self.table = boto3.resource("dynamodb").Table("patron-arbitrage-orders")
-        # self.firehose = boto3.client("firehose")
+    def __init__(self, table=None) -> None:
+        self.table = table if table else boto3.resource("dynamodb").Table("patron-arbitrage-orders")
 
     def get_order(self, client_order_id: str) -> Optional[Order]:
         assert client_order_id is not None
@@ -40,7 +39,6 @@ class OrderDao:
                 Item=self._convert_floats_to_decimals(prev_order_dict)
             )
 
-        order.created_at = current_time_ms()
         return self.table.put_item(
             Item=self._convert_floats_to_decimals(order.to_dict())
         )
