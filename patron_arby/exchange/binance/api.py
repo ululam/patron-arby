@@ -79,6 +79,14 @@ class BinanceApi(ExchangeApi):
 
         return self.order_convertor.from_rest_api_response(result_order)
 
+    def put_market_order(self, o: Order) -> Order:
+        result_order = self.client.order_market(
+            side=SIDE_BUY if o.is_buy() else SIDE_SELL,
+            symbol=o.symbol,
+            quantity=self._norm(o.quantity)
+        )
+        return self.order_convertor.from_rest_api_response(result_order)
+
     def get_open_orders(self) -> List[Order]:
         open_orders = self.client.get_open_orders()
         return [self.order_convertor.from_rest_api_response(o) for o in open_orders]

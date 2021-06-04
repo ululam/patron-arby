@@ -1,14 +1,12 @@
 import logging
+import random
 import threading
-from decimal import Decimal
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Set, Tuple
 
 from patron_arby.common.bus import Bus
 from patron_arby.common.chain import AChain, AChainStep
 from patron_arby.common.decorators import safely
-from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.common.order import Order
-from patron_arby.common.util import to_decimal
 from patron_arby.config.base import (
     MAX_BALANCE_RATIO_PER_SINGLE_ORDER,
     ORDER_PROFIT_THRESHOLD_USD,
@@ -16,6 +14,7 @@ from patron_arby.config.base import (
     TRADE_MANAGER_SORT_ARBITRAGE_BY_ROI,
 )
 from patron_arby.exchange.binance.constants import Binance
+from patron_arby.exchange.exchange_limitations import ExchangeLimitations
 from patron_arby.exchange.registry import BalancesRegistry
 from patron_arby.trade.recent_arbitragers_filter import RecentArbitragersFilter
 
@@ -31,7 +30,7 @@ class TradeManager(threading.Thread):
 
     def __init__(self,
                  bus: Bus,
-                 exchange_limitations: Dict[str, Dict[ExchangeLimitation, float]],
+                 exchange_limitations: ExchangeLimitations,
                  balances_registry: BalancesRegistry,
                  fire_only_top_arbitrage: bool = TRADE_MANAGER_FIRE_ONLY_TOP_ARBITRAGE,
                  sort_arbitrage_by_roi: bool = TRADE_MANAGER_SORT_ARBITRAGE_BY_ROI) -> None:
@@ -107,27 +106,37 @@ class TradeManager(threading.Thread):
 
         orders = self._create_orders(chain)
 
-        orders = [self._round_price_and_volume_to_market_requirements(order) for order in orders]
+        orders = [self.exchange_limitations.adjust_price_and_volume_to_market_requirements(order) for order in orders]
 
         meets_all_filters, error = self._check_meets_exchange_filters(orders)
         if not meets_all_filters:
             return error
 
-        self._put_orders_to_execution_queue(orders, chain)
+        self._put_orders_to_execution_queue(orders)
+
+        self._reduce_cached_balances(orders, chain)
 
         return "Orders created successfully"
 
-    def _put_orders_to_execution_queue(self, orders: List[Order], chain: AChain):
-        for order, step in zip(orders, chain.steps):
+    def _put_orders_to_execution_queue(self, orders: List[Order]):
+        # Do not change original list
+        orders_copy = orders.copy()
+        # Iterate in random order to provide better balances distribution
+        random.shuffle(orders_copy)
+
+        for order in orders_copy:
             # Put to the queue for order executors to pick up
             self.bus.fire_orders_queue.put(order)
+            log.debug(f"Put order {order}")
+
+    def _reduce_cached_balances(self, orders: List[Order], chain: AChain):
+        for order, step in zip(orders, chain.steps):
             # Extract order volume from local cache to prevent setting next order(s) when balance is actually consumed
             # by previous order(s) yet not really reflected in the balance itself (order(s) is in fly, waiting for fill,
             # balance cache has not been refreshed yet)
             # https://linear.app/good-it-works/issue/ACT-440/
             # Here, its important to use orders volume (not chain), as orders volumes are subject of adjustment
             self.balances_registry.reduce_balance(step.spending_coin(), order.get_what_we_propose_volume())
-            log.debug(f"Put order {order}")
 
     def _sort_chains_by_profitability(self, chains: Set[AChain]) -> List[AChain]:
         if self.sort_arbitrage_by_roi:
@@ -194,50 +203,11 @@ class TradeManager(threading.Thread):
 
     def _check_meets_exchange_filters(self, orders: List[Order]) -> Tuple[bool, str]:
         for order in orders:
-            meets_notional, msg = self._meets_min_notional(order)
+            meets_notional, message = self.exchange_limitations.check_meets_exchange_filters(order)
             if not meets_notional:
-                # If min min_notional is not met, put no orders
-                message = f"Order does not meet MIN_NOTIONAL filter ({msg})"
                 log.warning(message + f", skipping the whole chain: {order}")
                 return False, message
         return True, "Orders meet all filters"
-
-    def _meets_min_notional(self, order: Order) -> Tuple[bool, Optional[str]]:
-        """
-        :param order:
-        :return: True if order volume meets MIN_NOTIONAL exchange requirement, or if no MIN_NOTIONAL set.
-        If MIN_NOTIONAL set, and requirement is not met, returns False
-        """
-        limits = self.exchange_limitations.get(order.symbol)
-        if not limits:
-            log.fine(f"Limits for {order.symbol} not found")
-            return True, None
-        min_notional = limits.get(ExchangeLimitation.MIN_NOTIONAL)
-        if not min_notional:
-            return True, None
-
-        quantity_in_base_coin = order.quantity * order.price
-
-        return quantity_in_base_coin >= min_notional, f"{order.quantity} {order.symbol} ({quantity_in_base_coin} in " \
-                                                      f"base coin) < {min_notional}"
-
-    # todo https://linear.app/good-it-works/issue/ACT-417
-    # todo Shouldn't API do that?
-    def _round_price_and_volume_to_market_requirements(self, order: Order):
-        limits = self.exchange_limitations.get(order.symbol)
-        if not limits:
-            log.fine(f"Limits for {order.symbol} not found")
-            return
-
-        min_price_step = limits.get(ExchangeLimitation.MIN_PRICE_STEP)
-        if min_price_step:
-            order.price = to_decimal(order.price, Decimal(str(min_price_step)))
-
-        min_volume_step = limits.get(ExchangeLimitation.MIN_VOLUME_STEP)
-        if min_volume_step:
-            order.quantity = to_decimal(order.quantity, Decimal(str(min_volume_step)))
-
-        return order
 
     @staticmethod
     # todo Consider price and volume limitation: https://linear.app/good-it-works/issue/ACT-412

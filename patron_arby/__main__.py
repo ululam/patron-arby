@@ -24,7 +24,8 @@ from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.db.order_dao import OrderDao
 from patron_arby.exchange.binance.api import BinanceApi
-from patron_arby.exchange.binance.balance_checker import BalancesChecker
+from patron_arby.exchange.binance.balances_checker import BalancesChecker
+from patron_arby.exchange.binance.balances_rebalancer import BalancesRebalancer
 from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
@@ -56,6 +57,7 @@ class Main:
         while True:
             time.sleep(BALANCE_CHECKER_PERIOD_SECONDS)
             balances_checker.check_balance()
+            self._safe_check_and_fix_disbalance()
 
     @safely
     def _safe_update_balances(self):
@@ -64,6 +66,10 @@ class Main:
     @safely
     def _safe_update_exchange_rates(self):
         balances_registry.update_exchange_rates(self.binance_api.get_latest_prices())
+
+    @safely
+    def _safe_check_and_fix_disbalance(self):
+        self.balances_rebalancer.check_and_fix_disbalance()
 
     def _run_store_arbitrages(self):
         # Max size kinesis accepts is 500. Make it twice lower to ensure no overfill happens
@@ -85,8 +91,12 @@ class Main:
 
     def main(self, keys_provider: KeysProvider = KeysProvider()):
         # Create components
+        self.keys_provider = keys_provider
         self.binance_api = BinanceApi(keys_provider)
         self.arbitrage_dao = ArbitrageDao()
+        self.balances_rebalancer = BalancesRebalancer(self.binance_api, balances_registry,
+            BinanceExchangeLimitations(self.binance_api.get_exchange_info()).get_limitations(),
+            balances_checker.coins_of_interest)
 
         market_data = self._create_market_data()
 
@@ -144,7 +154,7 @@ class Main:
         order_executors: List[OrderExecutor] = list()
         for i in range(0, ORDER_EXECUTORS_NUMBER):
             order_executors.append(
-                OrderExecutor(bus, self.binance_api, order_dao))
+                OrderExecutor(bus, BinanceApi(self.keys_provider), order_dao))
         return order_executors
 
 

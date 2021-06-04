@@ -6,7 +6,7 @@ from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
 from patron_arby.common.util import current_time_ms
 from patron_arby.db.order_dao import OrderDao
-from patron_arby.exchange.binance.balance_checker import BalancesChecker
+from patron_arby.exchange.binance.balances_checker import BalancesChecker
 from patron_arby.exchange.exchange_api import ExchangeApi
 
 log = logging.getLogger(__name__)
@@ -31,6 +31,8 @@ class OrderExecutor(threading.Thread):
 
     def _post_order(self, o: Order) -> Order:
         log.info(f"Placing order {o.client_order_id}")
+        # Set fire time for statistics
+        o.fired_at = current_time_ms()
         try:
             result_order = self.exchange_api.put_order(o)
         except Exception as ex:
@@ -40,8 +42,9 @@ class OrderExecutor(threading.Thread):
             o.status = "ERROR"
             o.comment = f"{ex}"
             return o
-        # Set fire time for statistics
-        result_order.fired_at = current_time_ms()
+        # Preserve correct times
+        result_order.created_at = o.created_at
+        result_order.fired_at = o.fired_at
         log.debug(f"Placed order: {result_order}")
         return result_order
 

@@ -44,10 +44,19 @@ class ExchangeApi(ABC):
     @abc.abstractmethod
     def put_order(self, o: Order) -> Order:
         """
-        Puts the given order to the market
+        Puts the given order to the market as LIMIT order
         :param o:
         :return: result order as replied from the exchange
                 todo ATM, its not clear how the response should look like in generic case, for all exchanges
+        """
+        pass
+
+    @abc.abstractmethod
+    def put_market_order(self, o: Order) -> Order:
+        """
+        Puts the given order to the market  as LIMIT order
+        :param o:
+        :return: result order as replied from the exchange
         """
         pass
 
