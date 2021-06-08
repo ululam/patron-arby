@@ -26,12 +26,16 @@ class BalancesChecker:
         self.coins_of_interest = coins_of_interest
         self.stop_trading_balance_threshold_usd = stop_trading_balance_threshold_usd
         log.info(f"Watching balance for the following coins: {sorted(coins_of_interest)} ")
-        log.info(f"Trading will be forcibly stopped if those coins balance falls below "
+        log.info(f"Trading will be forcibly stopped if those coins total balance falls below "
                  f"${stop_trading_balance_threshold_usd}")
 
-    def check_balance(self) -> float:
+    def check_balance(self):
+        if self.registry.is_empty():
+            log.warning("Balances Registry is still empty, skipping run")
+            return
+
         balances = self.registry.get_balances(self.coins_of_interest)
-        total_balance_usd = sum([b.value_usd for b in balances.values()])
+        total_balance_usd = sum([b.value_usd for b in balances.values() if b.value_usd])    # Protect from None
         if total_balance_usd <= self.stop_trading_balance_threshold_usd:
             log.critical(f"Current trading balance {total_balance_usd} fell below STOP TRADING limit "
                          f"${self.stop_trading_balance_threshold_usd}. Trading is stopped")
@@ -44,15 +48,16 @@ class BalancesChecker:
 
         self.log_balances()
 
-        return total_balance_usd
-
     def balances_report(self) -> str:
+        if self.registry.is_empty():
+            return "Balances Registry is still empty, skipping report"
+
         balances = self.registry.get_balances(self.coins_of_interest)
         output = "\n=== Current balances: === \n"
         for coin in sorted(self.coins_of_interest):
             bal = balances.get(coin)
             output += SPACE.join([coin, self._dec(bal.value), f"${self._dec(bal.value_usd)}", "\n"])
-        total_balance_usd = sum([b.value_usd for b in balances.values()])
+        total_balance_usd = sum([b.value_usd for b in balances.values() if b.value_usd])
         output += f"=== Total: ${self._dec(total_balance_usd)} BUSD === "
         return output
 
@@ -61,6 +66,8 @@ class BalancesChecker:
 
     @staticmethod
     def _dec(v) -> str:
+        if not v:
+            return "0"
         return str(
             Decimal.from_float(float(v)).quantize(DECIMAL_PATTERN)
         )

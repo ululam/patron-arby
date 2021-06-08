@@ -4,12 +4,15 @@ from typing import Dict, Optional, Tuple, Union
 
 from patron_arby.common.order import Order
 from patron_arby.common.util import to_decimal
-from patron_arby.exchange.exchange_limitations import ExchangeLimitationName
+from patron_arby.exchange.exchange_limitations import (
+    ExchangeLimitationName,
+    ExchangeLimitations,
+)
 
 log = logging.getLogger(__name__)
 
 
-class BinanceExchangeLimitations:
+class BinanceExchangeLimitations(ExchangeLimitations):
     limits: Dict[str, Dict[ExchangeLimitationName, float]] = dict()
 
     def __init__(self, binance_exchange_info: Dict) -> None:
@@ -36,10 +39,11 @@ class BinanceExchangeLimitations:
         return order
 
     def check_meets_exchange_filters(self, order: Order) -> Tuple[bool, Optional[str]]:
-        meets_notional, msg = self._meets_min_notional(order)
+        meets_notional, message = self._meets_min_notional(order)
         if not meets_notional:
             # If min min_notional is not met, put no orders
-            return False, f"Order does not meet MIN_NOTIONAL filter ({msg})"
+            return False, f"Order does not meet MIN_NOTIONAL filter: ({message})"
+        return meets_notional, message
 
     def _meets_min_notional(self, order: Order) -> Tuple[bool, Optional[str]]:
         """

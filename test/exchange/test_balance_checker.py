@@ -13,6 +13,7 @@ class TestBalancesChecker(TestCase):
         bus = Bus()
         registry = Mock()
         registry.get_balances.return_value = {"BTC": Balance(1, threshold - 1)}
+        registry.is_empty.return_value = False
         coins_of_interest = {"BTC", "ETH"}
         balances_checker = BalancesChecker(bus, registry, coins_of_interest, threshold)
         # Disable method call
@@ -28,6 +29,7 @@ class TestBalancesChecker(TestCase):
         bus = Bus()
         registry = Mock()
         registry.get_balances.return_value = {"BTC": Balance(1, threshold), "ETH": Balance(1, 1)}
+        registry.is_empty.return_value = False
         coins_of_interest = {"BTC", "ETH"}
         balances_checker = BalancesChecker(bus, registry, coins_of_interest, threshold)
         # Disable method call

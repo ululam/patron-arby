@@ -30,7 +30,7 @@ class OrderDao:
         prev_order = self.get_order(order.client_order_id)
         if prev_order:
             prev_order_dict = prev_order.to_dict()
-            # Preserve/set values explicitly
+            # Preserve/set values explicitly!
             prev_order_dict["created_at"] = prev_order.created_at
             prev_order_dict["updated_at"] = current_time_ms()
             prev_order_dict["arbitrage_hash8"] = prev_order.arbitrage_hash8 if prev_order.arbitrage_hash8 \

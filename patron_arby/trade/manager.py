@@ -162,7 +162,7 @@ class TradeManager(threading.Thread):
     def _shrink_volumes_according_to_balances(self, chain: AChain,
             max_balance_ratio_per_order: float = MAX_BALANCE_RATIO_PER_SINGLE_ORDER) -> AChain:
         if self.balances_registry.is_empty():
-            log.debug("No balances set")
+            log.warning("No balances set (yet?)")
             return chain
         max_step_volume_to_balance_ratio = 0
         for step in chain.steps:

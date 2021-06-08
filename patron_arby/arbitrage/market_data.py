@@ -77,6 +77,13 @@ class MarketData:
         self.data[ticker.market] = ticker
         self.market_update_times[ticker.market] = current_time_ms()
 
+    def get_ticker(self, market: str):
+        if "/" in market:
+            return self.data.get(market)
+
+        base_quote_pair = self.symbol_to_base_quote_coins.get(market)
+        return self.data.get(base_quote_pair)
+
     def get_coins(self) -> List[str]:
         return list(self.trading_coins)
 

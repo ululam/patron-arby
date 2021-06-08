@@ -15,10 +15,12 @@ from patron_arby.config.base import (
     ARBITRAGE_FIRE_CHAIN_ASAP,
     BALANCE_CHECKER_PERIOD_SECONDS,
     BALANCE_UPDATER_PERIOD_SECONDS,
+    BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE,
     KINESIS_MAX_BATCH_SIZE,
     ORDER_EXECUTORS_NUMBER,
     POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS,
     THRESHOLD_BALANCE_USD_TO_STOP_TRADING,
+    BinanceTimeInForce,
 )
 from patron_arby.db.arbitrage_dao import ArbitrageDao
 from patron_arby.db.keys_provider import KeysProvider
@@ -29,6 +31,7 @@ from patron_arby.exchange.binance.balances_rebalancer import BalancesRebalancer
 from patron_arby.exchange.binance.limitations import BinanceExchangeLimitations
 from patron_arby.exchange.binance.listener import BinanceDataListener
 from patron_arby.exchange.binance.order_listener import BinanceOrderListener
+from patron_arby.exchange.order_cancelator import OrderCancelator
 from patron_arby.exchange.registry import BalancesRegistry
 from patron_arby.trade.executor import OrderExecutor
 from patron_arby.trade.manager import TradeManager
@@ -95,7 +98,7 @@ class Main:
         self.binance_api = BinanceApi(keys_provider)
         self.arbitrage_dao = ArbitrageDao()
         self.balances_rebalancer = BalancesRebalancer(self.binance_api, balances_registry,
-            BinanceExchangeLimitations(self.binance_api.get_exchange_info()).get_limitations(),
+            BinanceExchangeLimitations(self.binance_api.get_exchange_info()),
             balances_checker.coins_of_interest)
 
         market_data = self._create_market_data()
@@ -105,11 +108,10 @@ class Main:
         order_manager = self._create_order_manager(bus, balances_registry)
 
         order_dao = OrderDao()
-        order_executors = self._create_order_executors(order_dao)
+        order_executors = self._create_order_executors(order_dao, market_data, balances_checker)
 
         exchange_data_listener = BinanceDataListener(market_data, keys_provider,
             set(self.binance_api.get_all_markets()))
-        # https://linear.app/good-it-works/issue/ACT-442
 
         exchange_data_listener.add_event_listener(BinanceOrderListener(bus, order_dao))     # todo Via Bus?
         exchange_data_listener.add_event_listener(ArbitrageEventListener(bus))
@@ -132,6 +134,8 @@ class Main:
         for order_exec in order_executors:
             order_exec.start()
 
+        self._run_order_cancelator_if_needed()
+
         listener_thread.join()
 
     def _create_market_data(self) -> MarketData:
@@ -146,15 +150,21 @@ class Main:
             self.binance_api.get_default_trade_fee()
         )
 
+    def _run_order_cancelator_if_needed(self):
+        if BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE == BinanceTimeInForce.GOOD_TILL_CANCELLED:
+            order_cancelator = OrderCancelator(self.binance_api)
+            order_cancelator.start()
+
     def _create_order_manager(self, a_bus: Bus, registry: BalancesRegistry):
         limitations = BinanceExchangeLimitations(self.binance_api.get_exchange_info())
-        return TradeManager(a_bus, limitations.get_limitations(), registry)
+        return TradeManager(a_bus, limitations, registry)
 
-    def _create_order_executors(self, order_dao: OrderDao) -> List[OrderExecutor]:
+    def _create_order_executors(self, order_dao: OrderDao, market_data: MarketData, balances_checker: BalancesChecker) \
+            -> List[OrderExecutor]:
         order_executors: List[OrderExecutor] = list()
         for i in range(0, ORDER_EXECUTORS_NUMBER):
             order_executors.append(
-                OrderExecutor(bus, BinanceApi(self.keys_provider), order_dao))
+                OrderExecutor(bus, BinanceApi(self.keys_provider), order_dao, market_data, balances_checker))
         return order_executors
 
 

@@ -1,3 +1,5 @@
+from enum import Enum
+
 RUN_ARBITRAGE_SEARCH_PERIOD_MS = 100
 
 # Limit arbitrage search and trading to the following coins only
@@ -31,7 +33,7 @@ KINESIS_MAX_BATCH_SIZE = 500
 # Default coin for USD. Is Binance-specific at the moment
 DEFAULT_USD_COIN = "BUSD"
 
-BALANCE_UPDATER_PERIOD_SECONDS = 1
+BALANCE_UPDATER_PERIOD_SECONDS = 5
 BALANCE_CHECKER_PERIOD_SECONDS = 10
 
 BALANCE_CHECKER_DEVIATION_FROM_MEAN_TO_REBALANCE = 0.75
@@ -40,3 +42,20 @@ POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS = 0.1
 # todo Is not a constant but rather a parameter
 # If we fall below that balance (sum of all arbitrage coins in USD), trading is stopped
 THRESHOLD_BALANCE_USD_TO_STOP_TRADING = 300
+
+# How long order should live before get cancelled
+ORDER_CANCELATOR_ORDER_TTL_MS = 3_000
+
+ORDER_CANCELATOR_RUN_PERIOD_MS = ORDER_CANCELATOR_ORDER_TTL_MS
+
+
+class BinanceTimeInForce(Enum):
+    GOOD_TILL_CANCELLED = "GTC"
+    IMMEDIATE_OR_CANCEL = "IOC"
+    FILL_OR_KILL = "FOK"
+    GTX = 'GTX'  # Good Till Crossing, Post only order
+
+
+# @see https://github.com/binance-us/binance-official-api-docs/blob/master/rest-api.md#new-order--trade for details
+# BINANCE_LIMIT_ORDER_TIME_IN_FORCE = "FOK"
+BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE: BinanceTimeInForce = BinanceTimeInForce.IMMEDIATE_OR_CANCEL

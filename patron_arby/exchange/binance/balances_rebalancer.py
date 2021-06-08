@@ -31,6 +31,10 @@ class BalancesRebalancer:
                  f"mean balances value")
 
     def check_and_fix_disbalance(self):
+        if self.registry.is_empty():
+            log.warning("Balances Registry is still empty, skipping check")
+            return
+
         balances = self.registry.get_balances(self.coins_of_interest)
         # Remove Nones
         balances = {coin: Balance(bal.value if bal else 0, bal.value_usd if bal.value_usd else 0)
@@ -42,7 +46,13 @@ class BalancesRebalancer:
             log.info(f"Got big difference in balances, going to rebalance: {coin_min} => {value_min} << "
                      f"{coin_max} => {value_max}. Avg is {value_usd_avg}")
 
-            self._rebalance(coin_max, coin_min, (value_usd_avg - value_min.value_usd))
+            success = self._rebalance(coin_max, coin_min, (value_usd_avg - value_min.value_usd))
+            if not success:
+                coin_second_max, value_second_max = \
+                    max(balances.items(), key=lambda x: x[1].value_usd if x[0] != coin_max else -1)
+                log.warning(f"Unable to rebalance {coin_min} << {coin_max}. Trying second max coin: "
+                            f"{coin_min} => {value_min} << {coin_second_max} => {value_second_max}")
+                self._rebalance(coin_second_max, coin_min, (value_usd_avg - value_min.value_usd))
 
     def _rebalance(self, donor_coin: str, recipient_coin: str, value_usd: float):
         # todo Fix USD rate
@@ -54,8 +64,16 @@ class BalancesRebalancer:
                 return
 
         order = self.exchange_limitations.adjust_price_and_volume_to_market_requirements(order)
-        log.debug(f"Putting market order {order}")
-        self.exchange_api.put_market_order(order)
+        return self._safe_put_order(order)
+
+    def _safe_put_order(self, order: Order):
+        try:
+            log.debug(f"Putting market order {order}")
+            self.exchange_api.put_market_order(order)
+            return True
+        except Exception as ex:
+            log.error(f"Unable to put order: {ex}", exc_info=True)
+            return False
 
     def _rebalance_buy(self, donor_coin: str, recipient_coin: str, value_usd: float) -> Optional[Order]:
         market_buy = f"{recipient_coin}{donor_coin}"
