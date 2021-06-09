@@ -26,10 +26,6 @@ class Binance:
     REST_KEY_TYPE = "type"
     REST_KEY_FILLS = "fills"
     REST_KEY_TRANSACT_TIME = "transactTime"
+    REST_KEY_TIME = "time"
 
     USD_COINS = {"BUSD", "USDT", "USDC"}
-
-
-ORDER_CANCELATOR_RUN_PERIOD_MS = 1_000
-ORDER_CANCELATOR_ORDER_TTL_MS = 5_000
-ARBY_RUN_PERIOD_MS = 100

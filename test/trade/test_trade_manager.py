@@ -3,7 +3,6 @@ from unittest import TestCase
 from unittest.mock import Mock, call, patch
 
 from patron_arby.common.chain import AChain, AChainStep
-from patron_arby.common.exchange_limitation import ExchangeLimitation
 from patron_arby.common.order import Order, OrderSide
 from patron_arby.config.base import ORDER_PROFIT_THRESHOLD_USD
 from patron_arby.exchange.registry import BalancesRegistry
@@ -11,20 +10,6 @@ from patron_arby.trade.manager import TradeManager
 
 
 class TestTradeManager(TestCase):
-    def test__round_price_and_volume_to_market_requirements(self):
-        # 1. Arrange
-        limits = {"BTCUSD": {
-            ExchangeLimitation.MIN_PRICE_STEP: 0.01,
-            ExchangeLimitation.MIN_VOLUME_STEP: 0.001
-        }}
-        tm = TradeManager(Mock(), limits, Mock())
-        order = Order("", OrderSide.SELL, "BTCUSD", price=12.34245435, quantity=44.345945345345)
-        # 2. Act
-        order = tm._round_price_and_volume_to_market_requirements(order)
-        # 3. Assert
-        self.assertEqual(Decimal("12.34"), order.price)
-        self.assertEqual(Decimal("44.346"), order.quantity)
-
     def test__shrink_volumes_according_to_balances__simple_case(self):
         # 1. Arrange
         balances = BalancesRegistry({"BTC": 20, "USDT": 500, "ETH": 10})
@@ -180,7 +165,7 @@ class TestTradeManager(TestCase):
         # All chains put to "store" queue regardless of whether have been processed or not
         self.assertEqual([call(chain2), call(chain1)], bus.store_positive_arbitrages_queue.put.mock_calls)
 
-    def test__put_orders_to_execution_queue_reduces_balances(self):
+    def test___reduce_cached_balances_reduces_balances(self):
         # 1. Arrange
         balances_registry = Mock()
         balances_registry.reduce_balance = Mock()
@@ -199,7 +184,7 @@ class TestTradeManager(TestCase):
         steps = [step1, step2, step3]
         chain = AChain("BTC", steps)
         # 2. Act
-        tm._put_orders_to_execution_queue(orders, chain)
+        tm._reduce_cached_balances(orders, chain)
         # 3. Assert
         self.assertEqual([call("BTC", 2), call("USDT", 70_000), call("BUSD", 68_000)],
             balances_registry.reduce_balance.mock_calls)

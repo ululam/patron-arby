@@ -5,7 +5,7 @@ from threading import Thread
 from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
 from patron_arby.common.util import current_time_ms
-from patron_arby.exchange.binance.constants import (
+from patron_arby.config.base import (
     ORDER_CANCELATOR_ORDER_TTL_MS,
     ORDER_CANCELATOR_RUN_PERIOD_MS,
 )
@@ -21,10 +21,12 @@ class OrderCancelator(Thread):
         self.order_ttl_ms = order_ttl_ms
 
     def run(self) -> None:
+        log.info(f"Running with order TTL = {self.order_ttl_ms} ms")
         while True:
             time.sleep(ORDER_CANCELATOR_RUN_PERIOD_MS * 0.001)
             self._do_run()
 
+    @safely
     def _do_run(self):
         open_orders = self.exchange_api.get_open_orders()
         our_open_orders = [o for o in open_orders if o.is_our_order()]

@@ -3,9 +3,13 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL, TIME_IN_FORCE_IOC
+from binance.enums import SIDE_BUY, SIDE_SELL
 
 from patron_arby.common.order import Order
+from patron_arby.config.base import (
+    BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE,
+    BinanceTimeInForce,
+)
 from patron_arby.db.keys_provider import KeysProvider
 from patron_arby.exchange.binance.constants import Binance
 from patron_arby.exchange.binance.order_converter import BinanceOrderConverter
@@ -61,7 +65,8 @@ class BinanceApi(ExchangeApi):
         tickers = self.client.get_all_tickers()
         return {market_ticker.get("symbol"): float(market_ticker.get("price")) for market_ticker in tickers}
 
-    def put_order(self, o: Order, time_in_force=TIME_IN_FORCE_IOC) -> Order:
+    def put_order(self, o: Order, time_in_force: BinanceTimeInForce = BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE) \
+            -> Order:
         """
         :param o:
         :param time_in_force: Good until cancel, Immediate or cancel, Fill-or-Kill
@@ -74,9 +79,17 @@ class BinanceApi(ExchangeApi):
             quantity=self._norm(o.quantity),
             price=self._norm(o.price),
             newClientOrderId=o.client_order_id,
-            timeInForce=time_in_force
+            timeInForce=time_in_force.value
         )
 
+        return self.order_convertor.from_rest_api_response(result_order)
+
+    def put_market_order(self, o: Order) -> Order:
+        result_order = self.client.order_market(
+            side=SIDE_BUY if o.is_buy() else SIDE_SELL,
+            symbol=o.symbol,
+            quantity=self._norm(o.quantity)
+        )
         return self.order_convertor.from_rest_api_response(result_order)
 
     def get_open_orders(self) -> List[Order]:
@@ -84,7 +97,8 @@ class BinanceApi(ExchangeApi):
         return [self.order_convertor.from_rest_api_response(o) for o in open_orders]
 
     def cancel_order(self, symbol: str, order_id: str) -> object:
-        return self.client.cancel_order(symbol=symbol, order_id=order_id)
+        log.debug(f"Cancelling order market = {symbol}, order_id = {order_id}")
+        return self.client.cancel_order(symbol=symbol, orderId=order_id)
 
     @staticmethod
     def _norm(f: float) -> Decimal:

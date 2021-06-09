@@ -2,7 +2,8 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 from patron_arby.common.bus import Bus
-from patron_arby.exchange.binance.balance_checker import BalancesChecker
+from patron_arby.exchange.binance.balances_checker import BalancesChecker
+from patron_arby.exchange.registry import Balance
 
 
 class TestBalancesChecker(TestCase):
@@ -11,10 +12,12 @@ class TestBalancesChecker(TestCase):
         threshold = 100
         bus = Bus()
         registry = Mock()
-        registry.get_balance.return_value = 1
-        registry.get_balance_usd.return_value = 1
+        registry.get_balances.return_value = {"BTC": Balance(1, threshold - 1)}
+        registry.is_empty.return_value = False
         coins_of_interest = {"BTC", "ETH"}
         balances_checker = BalancesChecker(bus, registry, coins_of_interest, threshold)
+        # Disable method call
+        balances_checker.log_balances = Mock()
         # 2. Act
         balances_checker.check_balance()
         # 3. Assert
@@ -25,10 +28,12 @@ class TestBalancesChecker(TestCase):
         threshold = 100
         bus = Bus()
         registry = Mock()
-        registry.get_balance.return_value = 1
-        registry.get_balance_usd.return_value = threshold
+        registry.get_balances.return_value = {"BTC": Balance(1, threshold), "ETH": Balance(1, 1)}
+        registry.is_empty.return_value = False
         coins_of_interest = {"BTC", "ETH"}
         balances_checker = BalancesChecker(bus, registry, coins_of_interest, threshold)
+        # Disable method call
+        balances_checker.log_balances = Mock()
         # 2. Act
         balances_checker.check_balance()
         # 3. Assert

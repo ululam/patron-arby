@@ -1,10 +1,17 @@
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Set, Union
 
 from patron_arby.config.base import DEFAULT_USD_COIN
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class Balance:
+    value: float
+    value_usd: float
 
 
 class BalancesRegistry:
@@ -33,12 +40,21 @@ class BalancesRegistry:
             return None
         # We suggest that we always have trading pair coin/usd_coin
         market = f"{coin}{self.usd_coin}"
-        exchange_rate = self.exchange_rates.get(market)
+        exchange_rate = self.get_exchange_rate(market)
         if not exchange_rate:
             log.warning(f"No exchange rate found for {coin}")
             return None
 
         return balance * exchange_rate
+
+    def get_balances(self, coins_of_interest: Set[str]) -> Dict[str, Balance]:
+        """
+        :return: Dict of {coin -> Balance} for all coins in coins_of_interest
+        """
+        # Here, we can face a number of Nones. That's by intention, the only time we should rely on this information
+        # is when we have all the balances; that means, information is consistent, and we can apply further logic
+        # being sure that balances numbers are valid
+        return {coin: Balance(self.get_balance(coin), self.get_balance_usd(coin)) for coin in coins_of_interest}
 
     def update_balances(self, balances: Dict[str, float]):
         self.balances = balances
@@ -61,6 +77,9 @@ class BalancesRegistry:
 
     def update_exchange_rates(self, exchange_rates: Dict):
         self.exchange_rates = exchange_rates
+
+    def get_exchange_rate(self, market: str):
+        return self.exchange_rates.get(market)
 
     def is_empty(self):
         return not self.balances or len(self.balances) == 0

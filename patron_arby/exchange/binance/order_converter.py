@@ -32,7 +32,9 @@ class BinanceOrderConverter(ExchangeOrderConverter):
             quantity=api_order.get(Binance.REST_KEY_ORIG_QUANTITY),
             status=api_order.get(Binance.REST_KEY_STATUS),
             order_id=api_order.get(Binance.REST_KEY_ORDER_ID),
-            transaction_time=api_order.get(Binance.REST_KEY_TRANSACT_TIME)
+            transaction_time=api_order.get(Binance.REST_KEY_TRANSACT_TIME),
+            # todo Possible point of confusion, as its not our created_at but when order created at exchange
+            created_at=api_order.get(Binance.REST_KEY_TIME)
         )
         order.arbitrage_hash8 = self.get_arbitrage_hash8_from_client_order_id(order.client_order_id)
         order.rest_reply_raw_order = api_order
@@ -55,5 +57,5 @@ class BinanceOrderConverter(ExchangeOrderConverter):
         try:
             return int(client_order_id.split("_")[0])   # we suggest to have "12345678_order_1" client_order_id format
         except Exception as ex:
-            log.warning(f"Cannot get arbitrage hash8 from client order_id '{client_order_id}': {ex}")
+            log.warning(f"Cannot get arbitrage hash8 from client_order_id '{client_order_id}': {ex}")
             return None
