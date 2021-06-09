@@ -16,7 +16,7 @@ class TestOrderCancelator(TestCase):
         order2 = Order(client_order_id="1_order_2", order_side=OrderSide.BUY, symbol="ETHUSDT", quantity=0.1,
             price=2500, created_at=current_time_ms() - 2 * order_ttl_ms, order_id="456")
         exchange_api.get_open_orders.return_value = [order1, order2]
-        oc = OrderCancelator(exchange_api, order_ttl_ms)
+        oc = OrderCancelator(exchange_api, None, order_ttl_ms)
         # 2. Act
         oc._do_run()
         # 3. Assert
@@ -31,7 +31,7 @@ class TestOrderCancelator(TestCase):
         order2 = Order(client_order_id="1_order_2", order_side=OrderSide.BUY, symbol="ETHUSDT", quantity=0.1,
             price=2500, created_at=0, order_id="456")
         exchange_api.get_open_orders.return_value = [order1, order2]
-        oc = OrderCancelator(exchange_api, order_ttl_ms)
+        oc = OrderCancelator(exchange_api, None, order_ttl_ms)
         # 2. Act
         oc._do_run()
         # 3. Assert
@@ -47,7 +47,7 @@ class TestOrderCancelator(TestCase):
         order2 = Order(client_order_id="not_our_order", order_side=OrderSide.BUY, symbol="ETHUSDT", quantity=0.1,
             price=2500, created_at=0, order_id="456")     # not our client_order_id
         exchange_api.get_open_orders.return_value = [order1, order2]
-        oc = OrderCancelator(exchange_api, order_ttl_ms)
+        oc = OrderCancelator(exchange_api, None, order_ttl_ms)
         # 2. Act
         oc._do_run()
         # 3. Assert

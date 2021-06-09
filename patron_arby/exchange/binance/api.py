@@ -97,7 +97,6 @@ class BinanceApi(ExchangeApi):
         return [self.order_convertor.from_rest_api_response(o) for o in open_orders]
 
     def cancel_order(self, symbol: str, order_id: str) -> object:
-        log.debug(f"Cancelling order market = {symbol}, order_id = {order_id}")
         return self.client.cancel_order(symbol=symbol, orderId=order_id)
 
     @staticmethod

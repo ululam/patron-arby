@@ -19,7 +19,7 @@ TRADE_MANAGER_SORT_ARBITRAGE_BY_ROI = True
 ORDER_PROFIT_THRESHOLD_USD = 0.01
 
 # Maximum ratio (%) of balance that can participate in a single order
-MAX_BALANCE_RATIO_PER_SINGLE_ORDER = 1.0    # 100%
+MAX_BALANCE_RATIO_PER_SINGLE_ORDER = 0.9    # 100%
 
 # If we see same arbitrage chain, with the same profit, coming within the given time frame, we throttle it
 ARBITRAGE_DUPLICATION_TIMEFRAME_MS = 1_000
@@ -40,8 +40,8 @@ BALANCE_CHECKER_DEVIATION_FROM_MEAN_TO_REBALANCE = 0.75
 POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS = 0.1
 
 # todo Is not a constant but rather a parameter
-# If we fall below that balance (sum of all arbitrage coins in USD), trading is stopped
-THRESHOLD_BALANCE_USD_TO_STOP_TRADING = 300
+# If we lose the following % (well, its ratio not percent) of initial balance, trading is stopped
+BALANCE_FALL_TO_STOP_TRADING_RATIO = 0.20
 
 # How long order should live before get cancelled
 ORDER_CANCELATOR_ORDER_TTL_MS = 3_000
@@ -57,5 +57,5 @@ class BinanceTimeInForce(Enum):
 
 
 # @see https://github.com/binance-us/binance-official-api-docs/blob/master/rest-api.md#new-order--trade for details
-# BINANCE_LIMIT_ORDER_TIME_IN_FORCE = "FOK"
+# If == BinanceTimeInForce.GOOD_TILL_CANCELLED, OrderCancelator is started automatically.
 BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE: BinanceTimeInForce = BinanceTimeInForce.IMMEDIATE_OR_CANCEL

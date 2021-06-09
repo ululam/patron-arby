@@ -63,7 +63,7 @@ class TradeManager(threading.Thread):
         chains_list = self._sort_chains_by_profitability(chains)
 
         if self.fire_only_top_arbitrage:
-            message = f"Processing only the top chain {chains_list[0]} in the batch"
+            message = f"Processing only the top chain [{chains_list[0].hash8()}] {chains_list[0]} from the batch"
             log.debug(message)
             self._process_chain(chains_list[0])
             for i in range(1, len(chains_list)):
@@ -214,7 +214,8 @@ class TradeManager(threading.Thread):
     def _calc_break_even_price(step: AChainStep, chain: AChain) -> float:
         # https://linear.app/good-it-works/issue/ACT-411
         # Simple heuristic for break even price
-        price_factor = chain.roi / len(chain.steps)
+        # price_factor = chain.roi / len(chain.steps)
+        price_factor = chain.roi
         # Increase price if BUY, decrease if SELL
         price = step.price * (1 + price_factor) if step.is_buy() else step.price * (1 - price_factor)
         return price
