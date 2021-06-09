@@ -55,7 +55,6 @@ class BalancesRebalancer:
                 self._rebalance(coin_second_max, coin_min, (value_usd_avg - value_min.value_usd))
 
     def _rebalance(self, donor_coin: str, recipient_coin: str, value_usd: float):
-        # todo Fix USD rate
         order = self._rebalance_buy(donor_coin, recipient_coin, value_usd)
         if not order:
             order = self._rebalance_sell(donor_coin, recipient_coin, value_usd)

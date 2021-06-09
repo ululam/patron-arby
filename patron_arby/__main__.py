@@ -19,7 +19,6 @@ from patron_arby.config.base import (
     KINESIS_MAX_BATCH_SIZE,
     ORDER_EXECUTORS_NUMBER,
     POSITIVE_ARBITRAGE_STORE_PERIOD_SECONDS,
-    THRESHOLD_BALANCE_USD_TO_STOP_TRADING,
     BinanceTimeInForce,
 )
 from patron_arby.db.arbitrage_dao import ArbitrageDao
@@ -40,7 +39,7 @@ log = logging.getLogger("patron_arby.main")
 
 bus = Bus()
 balances_registry = BalancesRegistry()
-balances_checker = BalancesChecker(bus, balances_registry, ARBITRAGE_COINS, THRESHOLD_BALANCE_USD_TO_STOP_TRADING)
+balances_checker = BalancesChecker(bus, balances_registry, ARBITRAGE_COINS)
 
 
 class Main:
@@ -134,7 +133,7 @@ class Main:
         for order_exec in order_executors:
             order_exec.start()
 
-        self._run_order_cancelator_if_needed()
+        self._run_order_cancelator_if_needed(self.binance_api, market_data)
 
         listener_thread.join()
 
@@ -150,9 +149,9 @@ class Main:
             self.binance_api.get_default_trade_fee()
         )
 
-    def _run_order_cancelator_if_needed(self):
+    def _run_order_cancelator_if_needed(self, binance_api: BinanceApi, market_data: MarketData):
         if BINANCE_LIMIT_ORDER_DEFAULT_TIME_IN_FORCE == BinanceTimeInForce.GOOD_TILL_CANCELLED:
-            order_cancelator = OrderCancelator(self.binance_api)
+            order_cancelator = OrderCancelator(binance_api, market_data)
             order_cancelator.start()
 
     def _create_order_manager(self, a_bus: Bus, registry: BalancesRegistry):

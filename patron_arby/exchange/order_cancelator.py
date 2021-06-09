@@ -2,6 +2,7 @@ import logging
 import time
 from threading import Thread
 
+from patron_arby.arbitrage.market_data import MarketData
 from patron_arby.common.decorators import safely
 from patron_arby.common.order import Order
 from patron_arby.common.util import current_time_ms
@@ -15,10 +16,12 @@ log = logging.getLogger(__name__)
 
 
 class OrderCancelator(Thread):
-    def __init__(self, exchange_api: ExchangeApi, order_ttl_ms: int = ORDER_CANCELATOR_ORDER_TTL_MS) -> None:
+    def __init__(self, exchange_api: ExchangeApi, market_data: MarketData = None,
+                 order_ttl_ms: int = ORDER_CANCELATOR_ORDER_TTL_MS) -> None:
         super().__init__()
         self.exchange_api = exchange_api
         self.order_ttl_ms = order_ttl_ms
+        self.market_data = market_data
 
     def run(self) -> None:
         log.info(f"Running with order TTL = {self.order_ttl_ms} ms")
@@ -36,6 +39,10 @@ class OrderCancelator(Thread):
 
         log.info(f"Got {len(orders_to_cancel)} orders to cancel")
         for o in orders_to_cancel:
+            log.debug(f"Cancelling order market = {o.symbol}, order_id = {o.order_id}")
+            if self.market_data:
+                ticker = self.market_data.get_ticker(o.symbol)
+                log.info(f"Current ticker price for the orders's market {o.symbol} is {ticker}")
             self._cancel_order(o)
 
     @safely

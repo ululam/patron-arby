@@ -11,7 +11,7 @@ from patron_arby.common.util import current_time_ms
 
 class OrderDao:
     def __init__(self, table=None) -> None:
-        self.table = table if table else boto3.resource("dynamodb").Table("patron-arbitrage-orders")
+        self.table = table if table else boto3.resource("dynamodb").Table("patron-arbitrage-orders-new")
 
     def get_order(self, client_order_id: str) -> Optional[Order]:
         assert client_order_id is not None
