@@ -33,7 +33,7 @@ class BalancesRegistry:
             log.warning(f"No balance found for {coin}")
             return None
         if self._is_usd_coin(coin):
-            # Let's neglect USD coins cross echange rates (e.g. we consider BUSD = USDT, for the purpose of balance)
+            # Let's neglect USD coins cross exchange rates (e.g. we consider BUSD = USDT, for the purpose of balance)
             return balance
 
         if not self.exchange_rates or len(self.exchange_rates) == 0:
